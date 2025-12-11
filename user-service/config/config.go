@@ -21,9 +21,15 @@ type Database struct {
 	MaxIdleConnections int `json:"max_idle_connections"`
 }
 
+type Redis struct {
+	Host string `json:"host"`
+	Port string `json:"port"`
+}
+
 type Config struct {
 	App App `json:"app"`
 	Database Database `json:"database"`
+	Redis Redis `json:"redis"`
 }
 
 func NewConfig() *Config {
@@ -43,6 +49,10 @@ func NewConfig() *Config {
 			Name: viper.GetString("DATABASE_NAME"),
 			MaxOpenConnections: viper.GetInt("DAATABASE_MAX_OPEN_CONNECTIONS"),
 			MaxIdleConnections: viper.GetInt("DAATABASE_MAX_IDLE_CONNECTIONS"),
+		},
+		Redis: Redis{
+			Host: viper.GetString("REDIS_HOST"),
+			Port: viper.GetString("REDIS_PORT"),
 		},
 	}
 }

@@ -50,6 +50,7 @@ func (u *userHandler) SignIn(c echo.Context) error {
 	}
 
 	user, token, err := u.UserService.SignIn(ctx, reqEntity)
+	
 	if err != nil {
 		if err.Error() == "404" {
 			log.Errorf("[UserHandler-1] SignIn : %v", "User not found")
@@ -77,7 +78,6 @@ func (u *userHandler) SignIn(c echo.Context) error {
 	resp.Data = respSign
 
 	return c.JSON(http.StatusOK, resp)
-
 
 	
 }

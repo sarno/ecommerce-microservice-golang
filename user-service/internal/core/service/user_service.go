@@ -2,11 +2,15 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
-	"log"
+	"time"
+	"user-service/config"
 	"user-service/internal/adapter/repository"
 	"user-service/internal/core/domain/entity"
 	"user-service/utils/conv"
+
+	"github.com/labstack/gommon/log"
 )
 
 type IUserService interface {
@@ -15,6 +19,8 @@ type IUserService interface {
 
 type UserService struct {
 	repo repository.IUserRepository
+	cfg  *config.Config
+	jwtService IJWTService
 }
 
 // SignIn implements IUserService.
@@ -26,15 +32,45 @@ func (u *UserService) SignIn(ctx context.Context, req entity.UserEntity) (*entit
 
 	if !conv.CheckPasswordHash(req.Password, user.Password) {
 		err := errors.New("password incorrect")
-		log.Println(err)
+		log.Errorf("[UserService-2] SignIn: %v", err)
 		return nil, "", err
 	}
 
-	return user, "", nil
+	token, err := u.jwtService.GenerateToken(user.ID)
+	if err != nil {
+		return nil, "", err
+	}
+
+	sessionData := map[string]interface{}{
+		"user_id": user.ID,
+		"name":    user.Name,
+		"email":   user.Email,
+		"logged_in":   true,
+		"token":   token,
+		"role":    user.RoleName,
+		"created_at": time.Now().String(),
+	}
+
+	jsonData, err := json.Marshal(sessionData)
+	if err != nil {
+		return nil, "", err
+	}
+
+	redisConn := config.NewConfig().NewRedisClient()
+	err = redisConn.Set(ctx, token, jsonData, time.Hour*24).Err()
+
+	if err != nil {
+		log.Errorf("[UserService-4] SignIn: %v", err)
+		return nil, "",  err
+	}
+
+	return user, token, nil
 }
 
-func NewUserService(repo repository.IUserRepository) IUserService {
+func NewUserService(repo repository.IUserRepository, cfg *config.Config, jwtService IJWTService ) IUserService {
 	return &UserService{
 		repo: repo,
+		cfg:  cfg,
+		jwtService: jwtService,
 	}
 }

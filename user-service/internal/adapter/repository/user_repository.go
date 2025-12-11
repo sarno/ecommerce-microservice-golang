@@ -23,17 +23,17 @@ type UserRepository struct {
 	db *gorm.DB
 }
 
-// Delete implements IUserRepository.
+
 func (u *UserRepository) Delete(user entity.UserEntity) error {
 	panic("unimplemented")
 }
 
-// FindAll implements IUserRepository.
+
 func (u *UserRepository) FindAll() ([]entity.UserEntity, error) {
-	panic("unimplemented")
+ 	panic("unimplemented")
 }
 
-// FindById implements IUserRepository.
+
 func (u *UserRepository) FindById(id int) (entity.UserEntity, error) {
 	panic("unimplemented")
 }
