@@ -38,8 +38,10 @@ func (m *MiddlewareAdapter) CheckToken() echo.MiddlewareFunc {
 			}
 
 			tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+			log.Infof("[MiddlewareAdapter-2] InfoToken: %s", tokenString)
 
-				_, err := m.jwtService.ValidateToken(tokenString)
+			_, err := m.jwtService.ValidateToken(tokenString)
+			
 			if err != nil {
 				log.Errorf("[MiddlewareAdapter-2] CheckToken: %s", err.Error())
 				respErr.Message = err.Error()

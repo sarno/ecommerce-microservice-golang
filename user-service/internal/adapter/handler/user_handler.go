@@ -2,12 +2,15 @@ package handler
 
 import (
 	"net/http"
+	"user-service/config"
+	"user-service/internal/adapter"
 	"user-service/internal/adapter/handler/request"
 	"user-service/internal/adapter/handler/response"
 	"user-service/internal/core/domain/entity"
 	"user-service/internal/core/service"
 
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
 )
 
@@ -82,12 +85,20 @@ func (u *userHandler) SignIn(c echo.Context) error {
 	
 }
 
-func NewUserHandler(e *echo.Echo, userService service.IUserService) IUserHandler {
+func NewUserHandler(e *echo.Echo, userService service.IUserService, cfg *config.Config, jwtService service.IJWTService) IUserHandler {
 	userHandler := &userHandler{
 		UserService: userService,
 	}
-
+	
+	e.Use(middleware.Recover())
 	e.POST("/sign-in", userHandler.SignIn)
+
+	mid := adapter.NewMiddlewareAdapter(cfg, jwtService)
+	adminGroup := e.Group("/admin", mid.CheckToken())
+	adminGroup.GET("/check", func(c echo.Context) error {
+		return c.String(200, "OK")
+	})
+
 	// e.POST("/user/sign-up", userHandler.SignIn)
 	// e.GET("/user/profile", userHandler.SignIn)
 	// e.POST("/user/sign-out", userHandler.SignIn)

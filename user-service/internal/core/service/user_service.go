@@ -42,13 +42,13 @@ func (u *UserService) SignIn(ctx context.Context, req entity.UserEntity) (*entit
 	}
 
 	sessionData := map[string]interface{}{
-		"user_id": user.ID,
-		"name":    user.Name,
-		"email":   user.Email,
-		"logged_in":   true,
-		"token":   token,
-		"role":    user.RoleName,
+		"user_id":    user.ID,
+		"name":       user.Name,
+		"email":      user.Email,
+		"logged_in":  true,
 		"created_at": time.Now().String(),
+		"token":      token,
+		"role_name":  user.RoleName,
 	}
 
 	jsonData, err := json.Marshal(sessionData)
@@ -57,7 +57,7 @@ func (u *UserService) SignIn(ctx context.Context, req entity.UserEntity) (*entit
 	}
 
 	redisConn := config.NewConfig().NewRedisClient()
-	err = redisConn.Set(ctx, token, jsonData, time.Hour*24).Err()
+	err = redisConn.Set(ctx, token, jsonData, time.Hour*23).Err()
 
 	if err != nil {
 		log.Errorf("[UserService-4] SignIn: %v", err)
