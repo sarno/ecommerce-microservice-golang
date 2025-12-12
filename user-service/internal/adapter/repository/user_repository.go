@@ -15,17 +15,42 @@ type IUserRepository interface {
 	GetUserByEmail(ctx context.Context, email string) (*entity.UserEntity, error)
 	CreateUserAccount(ctx context.Context, req entity.UserEntity) (int, error)
 	UpdateUserVerified(ctx context.Context, userID int) (*entity.UserEntity, error)
+	UpdatePasswordByID(ctx context.Context, req entity.UserEntity) error
 }
 
 type UserRepository struct {
 	db *gorm.DB
 }
 
+// UpdatePasswordByID implements IUserRepository.
+func (u *UserRepository) UpdatePasswordByID(ctx context.Context, req entity.UserEntity) error {
+	userMdl := models.User{}	
+
+	if err := u.db.WithContext(ctx).Where("id = ?", req.ID).First(&userMdl).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = errors.New("404")
+			log.Errorf("[UserRepository-1] UpdatePasswordByID: %v", err)
+			return err
+		}
+		log.Errorf("[UserRepository-2] UpdatePasswordByID: %v", err)
+		return err
+	}
+
+	userMdl.Password = req.Password
+
+	if err := u.db.WithContext(ctx).Save(&userMdl).Error; err != nil {
+		log.Errorf("[UserRepository-3] UpdatePasswordByID: %v", err)
+		return err
+	}
+
+	return nil
+}
+
 // UpdateUserVerified implements IUserRepository.
 func (u *UserRepository) UpdateUserVerified(ctx context.Context, userID int) (*entity.UserEntity, error) {
 	modelUser := models.User{}
 
-	if err := u.db.Where("id = ?", userID).Preload("Roles").First(&modelUser).Error; err != nil {
+	if err := u.db.WithContext(ctx).Where("id = ?", userID).Preload("Roles").First(&modelUser).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			err = errors.New("404")
 			log.Errorf("[UserRepository-1] UpdateUserVerified: %v", err)
@@ -37,7 +62,7 @@ func (u *UserRepository) UpdateUserVerified(ctx context.Context, userID int) (*e
 
 	modelUser.IsVerified = true
 
-	if err := u.db.Save(&modelUser).Error; err != nil {
+	if err := u.db.WithContext(ctx).Save(&modelUser).Error; err != nil {
 		log.Errorf("[UserRepository-3] UpdateUserVerified: %v", err)
 		return nil, err
 	}
@@ -60,7 +85,7 @@ func (u *UserRepository) UpdateUserVerified(ctx context.Context, userID int) (*e
 func (u *UserRepository) CreateUserAccount(ctx context.Context, req entity.UserEntity) (int, error) {
 	var roleId int
 
-	if err := u.db.Select("id").
+	if err := u.db.WithContext(ctx).Select("id").
 		Where("name = ?", "user").
 		Model(&models.Role{}).
 		Scan(&roleId).
@@ -76,7 +101,7 @@ func (u *UserRepository) CreateUserAccount(ctx context.Context, req entity.UserE
 		Roles:    []models.Role{{ID: roleId}},
 	}
 
-	if err := u.db.Create(&userMdl).Error; err != nil {
+	if err := u.db.WithContext(ctx).Create(&userMdl).Error; err != nil {
 		log.Errorf("[UserRepository-2] CreateUserAccount : %v", err)
 		return 0, err
 	}
@@ -88,7 +113,7 @@ func (u *UserRepository) CreateUserAccount(ctx context.Context, req entity.UserE
 		ExpiresAt: time.Now().Add(time.Hour),
 	}
 
-	if err := u.db.Create(&verifyMdl).Error; err != nil {
+	if err := u.db.WithContext(ctx).Create(&verifyMdl).Error; err != nil {
 		log.Errorf("[UserRepository-3] CreateUserAccount : %v", err)
 		return 0, err
 	}
@@ -100,7 +125,7 @@ func (u *UserRepository) CreateUserAccount(ctx context.Context, req entity.UserE
 func (u *UserRepository) GetUserByEmail(ctx context.Context, email string) (*entity.UserEntity, error) {
 	userMdl := models.User{}
 
-	if err := u.db.Where("email = ? and is_verified = ?", email, true).Preload("Roles").First(&userMdl).Error; err != nil {
+	if err := u.db.WithContext(ctx).Where("email = ? and is_verified = ?", email, true).Preload("Roles").First(&userMdl).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			err = errors.New("404")
 			log.Infof("[UserRepository-1] GetUserByEmail : %v", err)
