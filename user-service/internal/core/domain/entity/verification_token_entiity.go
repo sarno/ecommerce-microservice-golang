@@ -3,8 +3,8 @@ package entity
 import "time"
 
 type VerificationTokenEntity struct {
-	ID        int64
-	UserID    int64
+	ID        int
+	UserID    int
 	Token     string
 	TokenType string
 	ExpiresAt time.Time

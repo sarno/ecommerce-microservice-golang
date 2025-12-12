@@ -20,12 +20,107 @@ import (
 type IUserService interface {
 	SignIn(ctx context.Context, req entity.UserEntity) (*entity.UserEntity, string, error)
 	CreateUserAccount(ctx context.Context, req entity.UserEntity) error
+	ForgotPassword(ctx context.Context, req entity.UserEntity) error
+	VerifyToken(ctx context.Context, token string) (*entity.UserEntity, error)
 }
 
 type UserService struct {
 	repo       repository.IUserRepository
 	cfg        *config.Config
 	jwtService IJWTService
+	repoToken  repository.IVerificationTokenRepository
+}
+
+// VerifyToken implements IUserService.
+func (u *UserService) VerifyToken(ctx context.Context, token string) (*entity.UserEntity, error) {
+	verifyToken, err := u.repoToken.GetDataByToken(ctx, token)
+
+	if err != nil {
+		log.Errorf("[UserService-1] VerifyToken: %v", err)
+		return nil, err
+	}
+
+	user, err := u.repo.UpdateUserVerified(ctx, verifyToken.UserID)
+	if err != nil {
+		log.Errorf("[UserService-2] VerifyToken: %v", err)
+		return nil, err
+	}
+
+	accessToken, err := u.jwtService.GenerateToken(user.ID)
+	if err != nil {
+		log.Errorf("[UserService-3] VerifyToken: %v", err)
+		return nil, err
+	}
+
+	sessionData := map[string]interface{}{
+		"user_id":    user.ID,
+		"name":       user.Name,
+		"email":      user.Email,
+		"logged_in":  true,
+		"created_at": time.Now().String(),
+		"token":      token,
+		"role_name":  user.RoleName,
+	}
+
+	jsonData, err := json.Marshal(sessionData)
+
+	if err != nil {
+		fmt.Println("Error encoding JSON:", err)
+		return nil, err
+	}
+
+	redisConn := config.NewConfig().NewRedisClient()
+	
+	err = redisConn.Set(ctx, token, jsonData, time.Hour*23).Err()
+	if err != nil {
+		log.Errorf("[UserService-4] VerifyToken: %v", err)
+		return nil, err
+	}
+
+	user.Token = accessToken
+
+	return user, nil
+}
+
+// ForgotPassword implements IUserService.
+func (u *UserService) ForgotPassword(ctx context.Context, req entity.UserEntity) error {
+	user, err := u.repo.GetUserByEmail(ctx, req.Email)
+	if err != nil {
+		log.Errorf("[UserService-1] ForgotPassword: %v", err)
+		return err
+	}
+
+	if user == nil {
+		err = errors.New("user not found")
+		log.Errorf("[UserService-2] ForgotPassword: %v", err)
+		return err
+	}
+
+	token := uuid.New().String()
+	reqEntity := entity.VerificationTokenEntity{
+		UserID:    user.ID,
+		Token:     token,
+		TokenType: utils.NOTIF_EMAIL_FORGOT_PASSWORD,
+	}
+
+	err = u.repoToken.CreateVerificationToken(ctx, reqEntity)
+	if err != nil {
+		log.Errorf("[UserService-3] ForgotPassword: %v", err)
+		return err
+	}
+
+	urlForgot := fmt.Sprintf("%s/auth/reset-password?token=%s", u.cfg.App.UrlFrontFE, token)
+	forgotMessage := fmt.Sprintf("Please reset your password by clicking the link below: %s", urlForgot)
+
+	go message.PublishMessage(
+		user.ID,
+		req.Email,
+		forgotMessage,
+		utils.NOTIF_EMAIL_FORGOT_PASSWORD,
+		"Reset Your Password",
+	)
+
+	return nil
 }
 
 // CreateUserAccount implements IUserService.
@@ -104,10 +199,11 @@ func (u *UserService) SignIn(ctx context.Context, req entity.UserEntity) (*entit
 	return user, token, nil
 }
 
-func NewUserService(repo repository.IUserRepository, cfg *config.Config, jwtService IJWTService) IUserService {
+func NewUserService(repo repository.IUserRepository, cfg *config.Config, jwtService IJWTService, repoToken repository.IVerificationTokenRepository) IUserService {
 	return &UserService{
 		repo:       repo,
 		cfg:        cfg,
 		jwtService: jwtService,
+		repoToken:  repoToken,
 	}
 }

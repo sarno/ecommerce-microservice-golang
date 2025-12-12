@@ -14,15 +14,52 @@ import (
 type IUserRepository interface {
 	GetUserByEmail(ctx context.Context, email string) (*entity.UserEntity, error)
 	CreateUserAccount(ctx context.Context, req entity.UserEntity) (int, error)
+	UpdateUserVerified(ctx context.Context, userID int) (*entity.UserEntity, error)
 }
 
 type UserRepository struct {
 	db *gorm.DB
 }
 
+// UpdateUserVerified implements IUserRepository.
+func (u *UserRepository) UpdateUserVerified(ctx context.Context, userID int) (*entity.UserEntity, error) {
+	modelUser := models.User{}
+
+	if err := u.db.Where("id = ?", userID).Preload("Roles").First(&modelUser).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = errors.New("404")
+			log.Errorf("[UserRepository-1] UpdateUserVerified: %v", err)
+			return nil, err
+		}
+		log.Errorf("[UserRepository-2] UpdateUserVerified: %v", err)
+		return nil, err
+	}
+
+	modelUser.IsVerified = true
+
+	if err := u.db.Save(&modelUser).Error; err != nil {
+		log.Errorf("[UserRepository-3] UpdateUserVerified: %v", err)
+		return nil, err
+	}
+
+	return &entity.UserEntity{
+		ID:         userID,
+		Name:       modelUser.Name,
+		Email:      modelUser.Email,
+		RoleName:   modelUser.Roles[0].Name,
+		Address:    modelUser.Address,
+		Lat:        modelUser.Lat,
+		Lng:        modelUser.Lng,
+		Phone:      modelUser.Phone,
+		Photo:      modelUser.Photo,
+		IsVerified: modelUser.IsVerified,
+	}, nil
+}
+
 // CreateUserAccount implements IUserRepository.
 func (u *UserRepository) CreateUserAccount(ctx context.Context, req entity.UserEntity) (int, error) {
 	var roleId int
+
 	if err := u.db.Select("id").
 		Where("name = ?", "user").
 		Model(&models.Role{}).
@@ -36,7 +73,7 @@ func (u *UserRepository) CreateUserAccount(ctx context.Context, req entity.UserE
 		Name:     req.Name,
 		Email:    req.Email,
 		Password: req.Password,
-		Roles: []models.Role{{ID: roleId}},
+		Roles:    []models.Role{{ID: roleId}},
 	}
 
 	if err := u.db.Create(&userMdl).Error; err != nil {
@@ -57,7 +94,7 @@ func (u *UserRepository) CreateUserAccount(ctx context.Context, req entity.UserE
 	}
 
 	return userMdl.ID, nil
-		
+
 }
 
 func (u *UserRepository) GetUserByEmail(ctx context.Context, email string) (*entity.UserEntity, error) {

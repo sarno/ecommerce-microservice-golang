@@ -18,10 +18,107 @@ import (
 type IUserHandler interface {
 	SignIn(ctx echo.Context) error
 	CreateUserAccount(ctx echo.Context) error
+	ForgotPassword(ctx echo.Context) error
+	VerifyAccount(c echo.Context) error
 }
 
 type userHandler struct {
 	UserService service.IUserService
+}
+
+// VerifyAccount implements IUserHandler.
+func (u *userHandler) VerifyAccount(c echo.Context) error {
+	var (
+		resp       = response.DefaultResponse{}
+		respSignIn = response.SignInResponse{}
+		ctx        = c.Request().Context()
+	)
+
+	tokenString := c.QueryParam("token")
+	if tokenString == "" {
+		log.Infof("[UserHandler-1] VerifyAccount: %s", "missing or invalid token")
+		resp.Message = "missing or invalid token"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
+
+	user, err := u.UserService.VerifyToken(ctx, tokenString)
+	if err != nil {
+		log.Errorf("[UserHandler-2] VerifyAccount: %v", err)
+		if err.Error() == "404" {
+			resp.Message = "User not found"
+			resp.Data = nil
+			return c.JSON(http.StatusNotFound, resp)
+		}
+
+		if err.Error() == "401" {
+			resp.Message = "Token expired or invalid"
+			resp.Data = nil
+			return c.JSON(http.StatusUnauthorized, resp)
+		}
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+
+	respSignIn.Id = user.ID
+	respSignIn.Name = user.Name
+	respSignIn.Email = user.Email
+	respSignIn.Role = user.RoleName
+	respSignIn.Lat = user.Lat
+	respSignIn.Lng = user.Lng
+	respSignIn.Phone = user.Phone
+	respSignIn.AccessToken = user.Token
+
+	resp.Message = "Success"
+	resp.Data = respSignIn
+
+	return c.JSON(http.StatusOK, resp)
+}
+
+// ForgotPassword implements IUserHandler.
+func (u *userHandler) ForgotPassword(c echo.Context) error {
+	var (
+		req  = request.ForgotPasswordRequest{}
+		resp = response.DefaultResponse{}
+		ctx  = c.Request().Context()
+		err  error
+	)
+
+	if err = c.Bind(&req); err != nil {
+		log.Errorf("[UserHandler-1] ForgotPassword: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusUnprocessableEntity, resp)
+	}
+
+	if err = c.Validate(req); err != nil {
+		log.Errorf("[UserHandler-2] ForgotPassword: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusUnprocessableEntity, resp)
+	}
+
+	reqEntity := entity.UserEntity{
+		Email: req.Email,
+	}
+
+	err = u.UserService.ForgotPassword(ctx, reqEntity)
+	if err != nil {
+		log.Errorf("[UserHandler-3] ForgotPassword: %v", err)
+		if err.Error() == "404" {
+			resp.Message = "User not found"
+			resp.Data = nil
+			return c.JSON(http.StatusNotFound, resp)
+		}
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+
+	resp.Message = "Success"
+	resp.Data = nil
+	return c.JSON(http.StatusOK, resp)
 }
 
 // CreateUserAccount implements IUserHandler.
@@ -30,6 +127,7 @@ func (u *userHandler) CreateUserAccount(c echo.Context) error {
 		req  = request.SignUpRequest{}
 		resp = response.DefaultResponse{}
 		ctx  = c.Request().Context()
+		err  error
 	)
 
 	if err = c.Bind(&req); err != nil {
@@ -57,20 +155,19 @@ func (u *userHandler) CreateUserAccount(c echo.Context) error {
 	}
 
 	resp.Message = "Success"
-	
+
 	return c.JSON(http.StatusCreated, resp)
 
 }
-
-var err error
 
 // SignIn implements IUserHandler.
 func (u *userHandler) SignIn(c echo.Context) error {
 	var (
 		req      = request.SignInRequest{}
 		resp     = response.DefaultResponse{}
-		respSign = response.SignResponse{}
+		respSign = response.SignInResponse{}
 		ctx      = c.Request().Context()
+		err      error
 	)
 
 	if err = c.Bind(&req); err != nil {
@@ -132,6 +229,8 @@ func NewUserHandler(e *echo.Echo, userService service.IUserService, cfg *config.
 	e.Use(middleware.Recover())
 	e.POST("/sign-in", userHandler.SignIn)
 	e.POST("/signup", userHandler.CreateUserAccount)
+	e.POST("/forgot-password", userHandler.ForgotPassword)
+	e.GET("/verify-account", userHandler.VerifyAccount)
 
 	mid := adapter.NewMiddlewareAdapter(cfg, jwtService)
 	adminGroup := e.Group("/admin", mid.CheckToken())

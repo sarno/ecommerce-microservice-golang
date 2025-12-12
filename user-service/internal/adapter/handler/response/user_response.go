@@ -1,6 +1,6 @@
 package response
 
-type SignResponse struct {
+type SignInResponse struct {
 	AccessToken  string `json:"access_token"`
 	Role         string `json:"role"`
 	Id           int    `json:"id"`
