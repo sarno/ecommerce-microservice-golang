@@ -17,10 +17,45 @@ type IUserRepository interface {
 	UpdateUserVerified(ctx context.Context, userID int) (*entity.UserEntity, error)
 	UpdatePasswordByID(ctx context.Context, req entity.UserEntity) error
 	GetUserByID(ctx context.Context, userID int) (*entity.UserEntity, error)
+	UpdateDataUser(ctx context.Context, req entity.UserEntity) error
 }
 
 type UserRepository struct {
 	db *gorm.DB
+}
+
+// UpdateDataUser implements IUserRepository.
+func (u *UserRepository) UpdateDataUser(ctx context.Context, req entity.UserEntity) error {
+	userMdl := models.User{
+		Name:      req.Name,
+		Email:     req.Email,
+		Address:   req.Address,
+		Phone:     req.Phone,
+		Photo:     req.Photo,
+	}
+
+	if err := u.db.WithContext(ctx).Model(&models.User{}).Where("id = ?", req.ID).Updates(userMdl).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = errors.New("404")
+			log.Errorf("[UserRepository-1] UpdateDataUser: %v", err)
+			return err
+		}
+		log.Errorf("[UserRepository-1] UpdateDataUser: %v", err)
+		return err
+	}
+
+	userMdl.Lat = req.Lat
+	userMdl.Lng = req.Lng
+	userMdl.Address = req.Address
+	userMdl.Phone = req.Phone
+
+	if err := u.db.UpdateColumns(&userMdl).Error; err != nil {
+		log.Errorf("[UserRepository-3] UpdateDataUser: %v", err)
+		return err
+	}
+
+	return nil
+	
 }
 
 // GetUserByID implements IUserRepository.
