@@ -35,11 +35,18 @@ type RabbitMQ struct {
 	Password string `json:"password"`
 }
 
+type Supabase struct {
+	Url string `json:"url"`
+	Key string `json:"key"`
+	Bucket string `json:"bucket"`
+}
+
 type Config struct {
 	App App `json:"app"`
 	Database Database `json:"database"`
 	Redis Redis `json:"redis"`
 	RabbitMQ RabbitMQ `json:"rabbitmq"`
+	Storage Supabase `json:"storage"`
 }
 
 func NewConfig() *Config {
@@ -70,6 +77,11 @@ func NewConfig() *Config {
 			Port: viper.GetString("RABBITMQ_PORT"),
 			User: viper.GetString("RABBITMQ_USER"),
 			Password: viper.GetString("RABBITMQ_PASSWORD"),
+		},
+		Storage: Supabase{
+			Url: viper.GetString("SUPABASE_STORAGE_URL"),
+			Key: viper.GetString("SUPABASE_STORAGE_KEY"),
+			Bucket: viper.GetString("SUPABASE_STORAGE_BUCKET"),
 		},
 	}
 }

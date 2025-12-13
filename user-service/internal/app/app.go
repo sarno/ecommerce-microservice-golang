@@ -9,6 +9,7 @@ import (
 	"user-service/config"
 	"user-service/internal/adapter/handler"
 	"user-service/internal/adapter/repository"
+	"user-service/internal/adapter/storage"
 	"user-service/internal/core/service"
 	"user-service/utils/validator"
 
@@ -30,6 +31,9 @@ func RunServer() {
 	}
 	defer db.Close()
 
+	storageHandler := storage.NewSupabase(cfg)
+	
+
 	userRepo := repository.NewUserRepository(db.DB)
 	tokenRepo := repository.NewVerificationTokenRepository(db.DB)
 
@@ -50,6 +54,7 @@ func RunServer() {
 	})
 
 	handler.NewUserHandler(e, userService, cfg, jwtService)
+	handler.NewUploadImageHandler(e, cfg, storageHandler, jwtService)
 
 	go func() {
 		if cfg.App.AppPort=="" {
