@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"user-service/config"
@@ -21,10 +22,67 @@ type IUserHandler interface {
 	ForgotPassword(ctx echo.Context) error
 	VerifyAccount(c echo.Context) error
 	UpdatePassword(ctx echo.Context) error
+	GetProfileUser(c echo.Context) error
 }
 
 type userHandler struct {
 	UserService service.IUserService
+}
+
+// GetProfileUser implements IUserHandler.
+func (u *userHandler) GetProfileUser(c echo.Context) error {
+	var (
+		resp        = response.DefaultResponse{}
+		respProfile = response.ProfileResponse{}
+		ctx         = c.Request().Context()
+		jwtUserData = entity.JwtUserData{}
+	)
+
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[UserHandler-1] GetProfileUser: %s", "data token not found")
+		resp.Message = "data token not found"
+		resp.Data = nil
+		return c.JSON(http.StatusNotFound, resp)
+	}
+
+	err := json.Unmarshal([]byte(user), &jwtUserData)
+	if err != nil {
+		log.Errorf("[UserHandler-2] GetProfileUser: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+
+	userID := jwtUserData.UserID
+
+	dataUser, err := u.UserService.GetProfileUser(ctx, userID)
+	if err != nil {
+		log.Errorf("[UserHandler-3] GetProfileUser: %v", err)
+		if err.Error() == "404" {
+			resp.Message = "user not found"
+			resp.Data = nil
+			return c.JSON(http.StatusNotFound, resp)
+		}
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+
+	respProfile.Address = dataUser.Address
+	respProfile.Name = dataUser.Name
+	respProfile.Email = dataUser.Email
+	respProfile.ID = dataUser.ID
+	respProfile.Lat = dataUser.Lat
+	respProfile.Lng = dataUser.Lng
+	respProfile.Phone = dataUser.Phone
+	respProfile.Photo = dataUser.Photo
+	respProfile.RoleName = dataUser.RoleName
+
+	resp.Message = "success"
+	resp.Data = respProfile
+
+	return c.JSON(http.StatusOK, resp)
 }
 
 // UpdatePassword implements IUserHandler.
@@ -309,6 +367,9 @@ func NewUserHandler(e *echo.Echo, userService service.IUserService, cfg *config.
 	adminGroup.GET("/check", func(c echo.Context) error {
 		return c.String(200, "OK")
 	})
+
+	authGroup := e.Group("/auth", mid.CheckToken())
+	authGroup.GET("/profile", userHandler.GetProfileUser)
 
 	return userHandler
 }

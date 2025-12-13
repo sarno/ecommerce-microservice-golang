@@ -23,6 +23,7 @@ type IUserService interface {
 	ForgotPassword(ctx context.Context, req entity.UserEntity) error
 	VerifyToken(ctx context.Context, token string) (*entity.UserEntity, error)
 	UpdatePassword(ctx context.Context, req entity.UserEntity) error
+	GetProfileUser(ctx context.Context, userID int) (*entity.UserEntity, error)
 }
 
 type UserService struct {
@@ -30,6 +31,11 @@ type UserService struct {
 	cfg        *config.Config
 	jwtService IJWTService
 	repoToken  repository.IVerificationTokenRepository
+}
+
+// GetProfileUser implements IUserService.
+func (u *UserService) GetProfileUser(ctx context.Context, userID int) (*entity.UserEntity, error) {
+	return u.repo.GetUserByID(ctx, userID)
 }
 
 // UpdatePassword implements IUserService.

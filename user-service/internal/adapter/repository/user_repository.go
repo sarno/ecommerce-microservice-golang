@@ -16,15 +16,42 @@ type IUserRepository interface {
 	CreateUserAccount(ctx context.Context, req entity.UserEntity) (int, error)
 	UpdateUserVerified(ctx context.Context, userID int) (*entity.UserEntity, error)
 	UpdatePasswordByID(ctx context.Context, req entity.UserEntity) error
+	GetUserByID(ctx context.Context, userID int) (*entity.UserEntity, error)
 }
 
 type UserRepository struct {
 	db *gorm.DB
 }
 
+// GetUserByID implements IUserRepository.
+func (u *UserRepository) GetUserByID(ctx context.Context, userID int) (*entity.UserEntity, error) {
+	modelUser := models.User{}
+	if err := u.db.Where("id =? AND is_verified = true", userID).Preload("Roles").First(&modelUser).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = errors.New("404")
+			log.Errorf("[UserRepository-1] GetUserByID: %v", err)
+			return nil, err
+		}
+		log.Errorf("[UserRepository-2] GetUserByID: %v", err)
+		return nil, err
+	}
+
+	return &entity.UserEntity{
+		ID:       modelUser.ID,
+		Email:    modelUser.Email,
+		Name:     modelUser.Name,
+		RoleName: modelUser.Roles[0].Name,
+		Lat:      modelUser.Lat,
+		Lng:      modelUser.Lng,
+		Address:  modelUser.Address,
+		Phone:    modelUser.Phone,
+		Photo:    modelUser.Photo,
+	}, nil
+}
+
 // UpdatePasswordByID implements IUserRepository.
 func (u *UserRepository) UpdatePasswordByID(ctx context.Context, req entity.UserEntity) error {
-	userMdl := models.User{}	
+	userMdl := models.User{}
 
 	if err := u.db.WithContext(ctx).Where("id = ?", req.ID).First(&userMdl).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
