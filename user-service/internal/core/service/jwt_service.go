@@ -23,7 +23,7 @@ func (j *jwtService) GenerateToken(userId int) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id": userId,
 		"iss":     j.issuer,
-		"exp":     time.Now().Add(time.Second * time.Duration(j.expiration)).Unix(),
+		"exp":     time.Now().Add(time.Duration(j.expiration) * time.Second).Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

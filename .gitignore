@@ -1,0 +1,80 @@
+# =========================
+# Go build artifacts
+# =========================
+/bin
+/build
+/dist
+/out
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# =========================
+# Go cache
+# =========================
+/vendor
+/go.work.sum
+/go.work
+
+# =========================
+# Environment & config
+# =========================
+.env
+.env.*
+*.local
+config/*.local.yaml
+config/*.local.yml
+config/*.local.json
+
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+tmp/
+
+# =========================
+# Debug & profiling
+# =========================
+*.pprof
+*.trace
+*.cover
+coverage/
+debug/
+
+# =========================
+# Editor & OS
+# =========================
+.idea
+.vscode
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# =========================
+# Docker
+# =========================
+.docker
+docker-compose.override.yml
+
+# =========================
+# CI / local scripts
+# =========================
+*.sh
+!.env.example
+
+# =========================
+# Air (hot reload)
+# =========================
+.air.toml
+.air.conf
+
+# =========================
+# Delve debugger
+# =========================
+__debug_bin
