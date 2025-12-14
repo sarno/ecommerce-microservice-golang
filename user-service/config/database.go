@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"log"
-	"user-service/database/seeds"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -37,10 +36,6 @@ func (cfg Config) ConnectionPostgres() (*Postgres, error) {
 
 	sqlDB.SetMaxOpenConns(cfg.Database.MaxOpenConnections)
 	sqlDB.SetMaxIdleConns(cfg.Database.MaxIdleConnections)
-
-	seeds.SeedUser(db)
-	seeds.SeedRole(db)
-	seeds.SeedUserRole(db)
 
 	return &Postgres{
 		DB: db,

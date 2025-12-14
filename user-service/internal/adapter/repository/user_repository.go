@@ -179,24 +179,35 @@ func (u *UserRepository) GetCustomerAll(ctx context.Context, query entity.QueryS
 	order := fmt.Sprintf("%s %s", query.OrderBy, query.OrderType)
 	offset := (query.Page - 1) * query.Limit
 
-	sqlMain := u.db.Preload("Roles", "name = ?", "Customer").
-		Where("name ILIKE ? OR email ILIKE ? OR phone ILIKE ?", "%"+query.Search+"%", "%"+query.Search+"%", "%"+query.Search+"%")
+	// Base query with JOINs to filter by "Customer" role first.
+	// This is the most critical optimization.
+	queryBuilder := u.db.Model(&models.User{}).
+		Joins("JOIN user_roles ON user_roles.user_id = users.id").
+		Joins("JOIN roles ON roles.id = user_roles.role_id").
+		Where("roles.name = ?", "user").
+		Where("(users.name || ' ' || users.phone || ' ' || users.email) ILIKE ?", "%"+query.Search+"%")
 
-	if err := sqlMain.Model(&models.User{}).Count(&countData).Error; err != nil {
+	// 1. Execute the COUNT query on the filtered dataset.
+	if err := queryBuilder.Count(&countData).Error; err != nil {
 		log.Errorf("[UserRepository-1] GetCustomerAll: %v", err)
 		return nil, 0, 0, err
 	}
 
-	totalPage := int(math.Ceil(float64(countData) / float64(query.Limit)))
+	totalPage := 0
+	if countData > 0 {
+		totalPage = int(math.Ceil(float64(countData) / float64(query.Limit)))
+	}
 
-	if err := sqlMain.Order(order).Limit(int(query.Limit)).Offset(int(offset)).Find(&modelUsers).Error; err != nil {
+	// 2. Execute the FIND query WITH Preload, Order, Limit, and Offset.
+	// Preload is still useful to fetch the Role details for the response.
+	if err := queryBuilder.Preload("Roles").Order(order).Limit(int(query.Limit)).Offset(int(offset)).Find(&modelUsers).Error; err != nil {
 		log.Errorf("[UserRepository-2] GetCustomerAll: %v", err)
 		return nil, 0, 0, err
 	}
 
 	if len(modelUsers) < 1 {
 		err := errors.New("404")
-		log.Errorf("[UserRepository-2] GetCustomerAll: No Customer found")
+		log.Errorf("[UserRepository-3] GetCustomerAll: No Customer found")
 		return nil, 0, 0, err
 	}
 

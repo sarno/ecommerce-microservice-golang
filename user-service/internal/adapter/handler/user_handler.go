@@ -3,8 +3,10 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"user-service/config"
 	"user-service/internal/adapter"
 	"user-service/internal/adapter/handler/request"
@@ -32,6 +34,8 @@ type IUserHandler interface {
 	GetCustomerAll(c echo.Context) error
 	GetCustomerByID(c echo.Context) error
 	CreateCustomer(c echo.Context) error
+	UpdateCustomer(c echo.Context) error
+	DeleteCustomer(c echo.Context) error
 }
 
 type userHandler struct {
@@ -619,13 +623,21 @@ func (u *userHandler) CreateCustomer(c echo.Context) error {
 		return c.JSON(http.StatusUnprocessableEntity, resp)
 	}
 
+	hashedPassword, err := conv.HashPassword(req.Password)
+	if err != nil {
+		log.Errorf("[UserHandler-5] CreateCustomer: failed to hash password %v", err)
+		resp.Message = "internal server error"
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+
 	latString := strconv.FormatFloat(req.Lat, 'g', -1, 64)
 	lngString := strconv.FormatFloat(req.Lng, 'g', -1, 64)
 
 	reqEntity := entity.UserEntity{
 		Name:     req.Name,
 		Email:    req.Email,
-		Password: req.Password,
+		Password: hashedPassword,
 		Phone:    req.Phone,
 		Address:  req.Address,
 		Lat:      latString,
@@ -636,8 +648,15 @@ func (u *userHandler) CreateCustomer(c echo.Context) error {
 
 	err = u.UserService.CreateCustomer(ctx, reqEntity)
 	if err != nil {
-		log.Errorf("[UserHandler-5] CreateCustomer: %v", err)
-		resp.Message = err.Error()
+		if strings.Contains(err.Error(), "violates unique constraint") {
+			log.Warnf("[UserHandler-6] CreateCustomer: Duplicate entry attempt: %v", err)
+			resp.Message = "Email already registered."
+			resp.Data = nil
+			return c.JSON(http.StatusConflict, resp)
+		}
+
+		log.Errorf("[UserHandler-7] CreateCustomer: %v", err)
+		resp.Message = "An internal server error occurred."
 		resp.Data = nil
 		return c.JSON(http.StatusInternalServerError, resp)
 	}
@@ -647,6 +666,175 @@ func (u *userHandler) CreateCustomer(c echo.Context) error {
 	resp.Pagination = nil
 
 	return c.JSON(http.StatusCreated, resp)
+}
+
+
+func (u *userHandler) UpdateCustomer(c echo.Context) error {
+	var (
+		resp = response.DefaultResponseWithPaginations{}
+		ctx  = c.Request().Context()
+		req  = request.UpdateCustomerRequest{}
+	)
+
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[UserHandler-1] UpdateCustomer: %s", "data token not found")
+		resp.Message = "data token not valid"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
+
+	err := c.Bind(&req)
+	if err != nil {
+		log.Errorf("[UserHandler-2] UpdateCustomer: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+
+	if err = c.Validate(&req); err != nil {
+		log.Errorf("[UserHandler-3] UpdateCustomer: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+
+	var hashedPassword string
+	if req.Password != "" {
+		if req.Password != req.PasswordConfirmation {
+			log.Infof("[UserHandler-4] UpdateCustomer: password and confirm password do not match")
+			resp.Message = "password and confirm password do not match"
+			resp.Data = nil
+			return c.JSON(http.StatusUnprocessableEntity, resp)
+		}
+
+		hashedPassword, err = conv.HashPassword(req.Password)
+		if err != nil {
+			log.Errorf("[UserHandler-5] UpdateCustomer: failed to hash password: %v", err)
+			resp.Message = "internal server error"
+			resp.Data = nil
+			return c.JSON(http.StatusInternalServerError, resp)
+		}
+	}
+
+	latString := ""
+	lngString := ""
+
+	if req.Lat != 0 {
+		latString = strconv.FormatFloat(req.Lat, 'g', -1, 64)
+	}
+
+	if req.Lng != 0 {
+		lngString = strconv.FormatFloat(req.Lng, 'g', -1, 64)
+	}
+
+	phoneString := fmt.Sprintf("%v", req.Phone)
+
+	idParamStr := c.Param("id")
+	if idParamStr == "" {
+		log.Infof("[UserHandler-6] UpdateCustomer: missing or invalid customer ID")
+		resp.Message = "missing or invalid customer ID"
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+
+	id, err := conv.StringToInt(idParamStr)
+	if err != nil {
+		log.Infof("[UserHandler-7] UpdateCustomer: invalid customer ID")
+		resp.Message = "invalid customer ID"
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+
+	reqEntity := entity.UserEntity{
+		ID:       id,
+		Name:     req.Name,
+		Email:    req.Email,
+		Password: hashedPassword, // Will be empty if not provided, and ignored by the repository
+		Phone:    phoneString,
+		Address:  req.Address,
+		Lat:      latString,
+		Lng:      lngString,
+		Photo:    req.Photo,
+		RoleID:   req.RoleID,
+	}
+
+	err = u.UserService.UpdateCustomer(ctx, reqEntity)
+	if err != nil {
+		if strings.Contains(err.Error(), "violates unique constraint") {
+			log.Warnf("[UserHandler-8] UpdateCustomer: Duplicate entry attempt: %v", err)
+			resp.Message = "Email already registered."
+			resp.Data = nil
+			return c.JSON(http.StatusConflict, resp)
+		}
+
+		if err.Error() == "404" {
+			log.Warnf("[UserHandler-9] UpdateCustomer: Customer not found: %v", err)
+			resp.Message = "Customer not found"
+			resp.Data = nil
+			return c.JSON(http.StatusNotFound, resp)
+		}
+
+		log.Errorf("[UserHandler-10] UpdateCustomer: %v", err)
+		resp.Message = "An internal server error occurred."
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+
+	resp.Message = "success"
+	resp.Data = nil
+
+	return c.JSON(http.StatusOK, resp)
+}
+
+func (u *userHandler) DeleteCustomer(c echo.Context) error {
+	var (
+		resp = response.DefaultResponseWithPaginations{}
+		ctx  = c.Request().Context()
+	)
+
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[UserHandler-1] DeleteCustomer: %s", "data token not found")
+		resp.Message = "data token not valid"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
+
+	idParamStr := c.Param("id")
+	if idParamStr == "" {
+		log.Infof("[UserHandler-2] DeleteCustomer: %s", "missing or invalid customer ID")
+		resp.Message = "missing or invalid customer ID"
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+
+	id, err := conv.StringToInt(idParamStr)
+	if err != nil {
+		log.Infof("[UserHandler-3] DeleteCustomer: %s", "invalid customer ID")
+		resp.Message = "invalid customer ID"
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+
+	err = u.UserService.DeleteCustomer(ctx, id)
+	if err != nil {
+		log.Errorf("[UserHandler-4] DeleteCustomer: %v", err)
+		if err.Error() == "404" {
+			resp.Message = "Customer not found"
+			resp.Data = nil
+			return c.JSON(http.StatusNotFound, resp)
+		}
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+
+	resp.Message = "success"
+	resp.Data = nil
+
+	return c.JSON(http.StatusOK, resp)
+
 }
 
 // SignIn implements IUserHandler.
@@ -664,6 +852,11 @@ func NewUserHandler(e *echo.Echo, userService service.IUserService, cfg *config.
 
 	mid := adapter.NewMiddlewareAdapter(cfg, jwtService)
 	adminGroup := e.Group("/admin", mid.CheckToken())
+	adminGroup.GET("/customers", userHandler.GetCustomerAll)
+	adminGroup.POST("/customers", userHandler.CreateCustomer)
+	adminGroup.PUT("/customers/:id", userHandler.UpdateCustomer)
+	adminGroup.GET("/customers/:id", userHandler.GetCustomerByID)
+	adminGroup.DELETE("/customers/:id", userHandler.DeleteCustomer)
 	adminGroup.GET("/check", func(c echo.Context) error {
 		return c.String(200, "OK")
 	})

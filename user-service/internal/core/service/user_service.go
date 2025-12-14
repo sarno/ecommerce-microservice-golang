@@ -46,14 +46,14 @@ func (u *UserService) CreateCustomer(ctx context.Context, req entity.UserEntity)
 	passwordNoEncrypt := req.Password
 	password, err := conv.HashPassword(passwordNoEncrypt)
 	if err != nil {
-		log.Fatalf("[UserService-1] CreateCustomer: %v", err)
+		log.Errorf("[UserService-1] CreateCustomer: %v", err)
 		return err
 	}
 
 	req.Password = password
 	userID, err := u.repo.CreateCustomer(ctx, req)
 	if err != nil {
-		log.Fatalf("[UserService-2] CreateCustomer: %v", err)
+		log.Errorf("[UserService-2] CreateCustomer: %v", err)
 		return err
 	}
 
@@ -79,7 +79,7 @@ func (u *UserService) UpdateCustomer(ctx context.Context, req entity.UserEntity)
 		passwordNoencrypt = req.Password
 		password, err := conv.HashPassword(req.Password)
 		if err != nil {
-			log.Fatalf("[UserService-1] UpdateCustomer: %v", err)
+			log.Errorf("[UserService-1] UpdateCustomer: %v", err)
 			return err
 		}
 
@@ -88,7 +88,7 @@ func (u *UserService) UpdateCustomer(ctx context.Context, req entity.UserEntity)
 
 	err := u.repo.UpdateCustomer(ctx, req)
 	if err != nil {
-		log.Fatalf("[UserService-2] UpdateCustomer: %v", err)
+		log.Errorf("[UserService-2] UpdateCustomer: %v", err)
 		return err
 	}
 
@@ -312,6 +312,7 @@ func (u *UserService) SignIn(ctx context.Context, req entity.UserEntity) (*entit
 	if err != nil {
 		return nil, "", err
 	}
+
 
 	redisConn := config.NewConfig().NewRedisClient()
 	err = redisConn.Set(ctx, token, jsonData, time.Hour*23).Err()
