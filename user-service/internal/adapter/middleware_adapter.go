@@ -47,7 +47,7 @@ func (m *MiddlewareAdapter) CheckToken() echo.MiddlewareFunc {
 			}
 
 			getSession, err := redisConn.Get(c.Request().Context(), tokenString).Result()
-			
+
 			if err != nil || len(getSession) == 0 {
 				log.Errorf("[MiddlewareAdapter-3] CheckToken: %s", err.Error())
 				respErr.Message = err.Error()

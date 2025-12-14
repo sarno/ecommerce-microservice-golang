@@ -6,10 +6,22 @@ import (
 )
 
 type DefaultResponse struct {
-	Message string `json:"message"`
+	Message string      `json:"message"`
 	Data    interface{} `json:"data"`
 }
 
+type DefaultResponseWithPaginations struct {
+	Message    string      `json:"message"`
+	Data       interface{} `json:"data"`
+	Pagination *Pagination `json:"pagination,omitempty"`
+}
+
+type Pagination struct {
+	Page       int `json:"page"`
+	TotalCount int `json:"total_count"`
+	PerPage    int `json:"per_page"`
+	TotalPage  int `json:"total_page"`
+}
 
 func RespondWithError(c echo.Context, code int, context string, err error) error {
 	log.Errorf("%s: %v", context, err)
@@ -19,3 +31,5 @@ func RespondWithError(c echo.Context, code int, context string, err error) error
 	}
 	return c.JSON(code, resp)
 }
+
+

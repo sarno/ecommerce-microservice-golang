@@ -32,7 +32,6 @@ func RunServer() {
 	defer db.Close()
 
 	storageHandler := storage.NewSupabase(cfg)
-	
 
 	userRepo := repository.NewUserRepository(db.DB)
 	tokenRepo := repository.NewVerificationTokenRepository(db.DB)
@@ -42,10 +41,8 @@ func RunServer() {
 	userService := service.NewUserService(userRepo, cfg, jwtService, tokenRepo)
 	roleService := service.NewRoleService(roleRepo)
 
-
 	e := echo.New()
 	e.Use(middleware.CORS())
-	
 
 	customValidator := validator.NewValidator()
 	en.RegisterDefaultTranslations(customValidator.Validator, customValidator.Translator)
@@ -60,11 +57,11 @@ func RunServer() {
 	handler.NewRoleHandler(e, roleService, cfg, jwtService)
 
 	go func() {
-		if cfg.App.AppPort=="" {
+		if cfg.App.AppPort == "" {
 			cfg.App.AppPort = os.Getenv("APP_PORT")
 		}
 
-		err = e.Start(":"+ cfg.App.AppPort)
+		err = e.Start(":" + cfg.App.AppPort)
 
 		if err != nil {
 			log.Fatalf(
@@ -90,6 +87,6 @@ func RunServer() {
 	}
 
 	log.Print("Server shut down")
-	
+
 	e.Shutdown(ctx)
 }

@@ -30,7 +30,7 @@ func (r *RoleService) DeleteRole(ctx context.Context, id int) error {
 
 // GetAllRole implements IRoleService.
 func (r *RoleService) GetAllRole(ctx context.Context, search string) ([]entity.RoleEntity, error) {
-	return r.repo.GetAllRole(ctx,  search)
+	return r.repo.GetAllRole(ctx, search)
 }
 
 // GetRoleByID implements IRoleService.

@@ -58,7 +58,7 @@ func (u *uploadImageHandler) UploadImage(c echo.Context) error {
 	newFileName := fmt.Sprintf("%s_%d%s", uuid.New().String(), time.Now().Unix(), getExtension(file.Filename))
 	uploadPath := fmt.Sprintf("public/uploads/%s", newFileName)
 	url, err := u.storage.UploadFile(uploadPath, fileBuffer)
-	
+
 	if err != nil {
 		log.Errorf("[UploadImage-4] UploadImage: %v", err)
 		resp.Message = err.Error()
@@ -68,7 +68,7 @@ func (u *uploadImageHandler) UploadImage(c echo.Context) error {
 
 	resp.Message = "Success"
 	resp.Data = map[string]string{"image_url": url}
-	
+
 	return c.JSON(http.StatusOK, resp)
 }
 
@@ -80,7 +80,7 @@ func getExtension(fileName string) string {
 	return ext
 }
 
-func NewUploadImageHandler(e *echo.Echo, cfg *config.Config,storage storage.ISupabase, jwtService service.IJWTService) IUploadImageHandler {
+func NewUploadImageHandler(e *echo.Echo, cfg *config.Config, storage storage.ISupabase, jwtService service.IJWTService) IUploadImageHandler {
 	res := &uploadImageHandler{
 		storage: storage,
 	}

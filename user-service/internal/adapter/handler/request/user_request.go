@@ -6,11 +6,10 @@ type SignInRequest struct {
 }
 
 type SignUpRequest struct {
-	Name     string `json:"name" validate:"required"`
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"min=5,required"`
+	Name            string `json:"name" validate:"required"`
+	Email           string `json:"email" validate:"required,email"`
+	Password        string `json:"password" validate:"min=5,required"`
 	PasswordConfirm string `json:"password_confirm" validate:"min=5,required"`
-	
 }
 
 type ForgotPasswordRequest struct {

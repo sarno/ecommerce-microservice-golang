@@ -31,9 +31,9 @@ type roleHandler struct {
 // Create implements IRoleHandler.
 func (r *roleHandler) Create(c echo.Context) error {
 	var (
-		req = request.RoleRequest{}
-		resp = response.DefaultResponse{}
-		ctx = c.Request().Context()
+		req         = request.RoleRequest{}
+		resp        = response.DefaultResponse{}
+		ctx         = c.Request().Context()
 		jwtUserData = entity.JwtUserData{}
 	)
 
@@ -88,14 +88,14 @@ func (r *roleHandler) Create(c echo.Context) error {
 
 	resp.Message = "Success"
 	resp.Data = nil
-	return c.JSON(http.StatusOK, resp)	
+	return c.JSON(http.StatusOK, resp)
 }
 
 // Delete implements IRoleHandler.
 func (r *roleHandler) Delete(c echo.Context) error {
 	var (
-		resp = response.DefaultResponse{}
-		ctx  = c.Request().Context()
+		resp        = response.DefaultResponse{}
+		ctx         = c.Request().Context()
 		jwtUserData = entity.JwtUserData{}
 	)
 
@@ -138,7 +138,6 @@ func (r *roleHandler) Delete(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, resp)
 	}
 
-
 	err = r.RoleService.DeleteRole(ctx, roleId)
 	if err != nil {
 		log.Errorf("[RoleHandler-6] Delete: %v", err)
@@ -164,7 +163,7 @@ func (r *roleHandler) GetAll(c echo.Context) error {
 	var (
 		respRole = []response.RoleResponse{}
 		resp     = response.DefaultResponse{}
-		ctx  = c.Request().Context()
+		ctx      = c.Request().Context()
 	)
 
 	user := c.Get("user").(string)
@@ -184,7 +183,7 @@ func (r *roleHandler) GetAll(c echo.Context) error {
 		resp.Data = nil
 		return c.JSON(http.StatusInternalServerError, resp)
 	}
-	
+
 	for _, role := range roles {
 		respRole = append(respRole, response.RoleResponse{
 			ID:   role.ID,
@@ -200,9 +199,9 @@ func (r *roleHandler) GetAll(c echo.Context) error {
 // GetByID implements IRoleHandler.
 func (r *roleHandler) GetByID(c echo.Context) error {
 	var (
-		resp = response.DefaultResponse{}
-		respRole = response.RoleResponse{}
-		ctx  = c.Request().Context()
+		resp        = response.DefaultResponse{}
+		respRole    = response.RoleResponse{}
+		ctx         = c.Request().Context()
 		jwtUserData = entity.JwtUserData{}
 	)
 
@@ -262,7 +261,7 @@ func (r *roleHandler) GetByID(c echo.Context) error {
 	respRole.ID = role.ID
 	respRole.Name = role.Name
 
-	resp.Message = "Success"	
+	resp.Message = "Success"
 	resp.Data = respRole
 
 	return c.JSON(http.StatusOK, resp)
@@ -271,9 +270,9 @@ func (r *roleHandler) GetByID(c echo.Context) error {
 // Update implements IRoleHandler.
 func (r *roleHandler) Update(c echo.Context) error {
 	var (
-		req = request.RoleRequest{}
-		resp = response.DefaultResponse{}
-		ctx = c.Request().Context()
+		req         = request.RoleRequest{}
+		resp        = response.DefaultResponse{}
+		ctx         = c.Request().Context()
 		jwtUserData = entity.JwtUserData{}
 	)
 
@@ -333,7 +332,6 @@ func (r *roleHandler) Update(c echo.Context) error {
 	roleEntity := entity.RoleEntity{
 		ID:   roleID,
 		Name: req.Name,
-		
 	}
 	err = r.RoleService.UpdateRole(ctx, roleEntity)
 	if err != nil {

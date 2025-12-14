@@ -10,7 +10,7 @@ import (
 )
 
 type Validator struct {
-	Validator *validator.Validate
+	Validator  *validator.Validate
 	Translator ut.Translator
 }
 
@@ -26,7 +26,7 @@ func NewValidator() *Validator {
 	validate := validator.New()
 
 	return &Validator{
-		Validator: validate,
+		Validator:  validate,
 		Translator: translator,
 	}
 }
@@ -37,7 +37,7 @@ func (v *Validator) Validate(i interface{}) error {
 	if err != nil {
 		object, _ := err.(validator.ValidationErrors)
 
-		for _, e := range object{
+		for _, e := range object {
 			log.Infof(
 				"[Validator-1] Field: %s, Error: %s",
 				e.Field(),
@@ -46,6 +46,6 @@ func (v *Validator) Validate(i interface{}) error {
 			return errors.New(e.Translate(v.Translator))
 		}
 	}
-	
+
 	return nil
 }

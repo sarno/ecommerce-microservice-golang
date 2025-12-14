@@ -9,8 +9,7 @@ import (
 	"github.com/streadway/amqp"
 )
 
-
-func PublishMessage(userId int, email, message, queueName, subject string) error  {
+func PublishMessage(userId int, email, message, queueName, subject string) error {
 	conn, err := config.NewConfig().NewRabbitMQ()
 	if err != nil {
 		log.Errorf("[PublishMessage-1] PublishMessage: %v", err)
@@ -42,16 +41,16 @@ func PublishMessage(userId int, email, message, queueName, subject string) error
 	}
 
 	notifType := "EMAIL"
-	
+
 	if queueName == utils.PUSH_NOTIF {
 		notifType = "PUSH"
 	}
 
 	notification := map[string]interface{}{
-		"receiver_email": email,
-		"message": message,
-		"receiver_id": userId,
-		"subject": subject,
+		"receiver_email":    email,
+		"message":           message,
+		"receiver_id":       userId,
+		"subject":           subject,
 		"notification_type": notifType,
 	}
 

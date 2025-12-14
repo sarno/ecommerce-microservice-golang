@@ -25,6 +25,13 @@ type IUserService interface {
 	UpdatePassword(ctx context.Context, req entity.UserEntity) error
 	GetProfileUser(ctx context.Context, userID int) (*entity.UserEntity, error)
 	UpdateDataUser(ctx context.Context, req entity.UserEntity) error
+
+	// modul user
+	GetCustomerAll(ctx context.Context, query entity.QueryStringCustomer) ([]entity.UserEntity, int, int, error)
+	GetCustomerByID(ctx context.Context, customerID int) (*entity.UserEntity, error)
+	CreateCustomer(ctx context.Context, req entity.UserEntity) error
+	UpdateCustomer(ctx context.Context, req entity.UserEntity) error
+	DeleteCustomer(ctx context.Context, customerID int) error
 }
 
 type UserService struct {
@@ -32,6 +39,79 @@ type UserService struct {
 	cfg        *config.Config
 	jwtService IJWTService
 	repoToken  repository.IVerificationTokenRepository
+}
+
+// CreateCustomer implements IUserService.
+func (u *UserService) CreateCustomer(ctx context.Context, req entity.UserEntity) error {
+	passwordNoEncrypt := req.Password
+	password, err := conv.HashPassword(passwordNoEncrypt)
+	if err != nil {
+		log.Fatalf("[UserService-1] CreateCustomer: %v", err)
+		return err
+	}
+
+	req.Password = password
+	userID, err := u.repo.CreateCustomer(ctx, req)
+	if err != nil {
+		log.Fatalf("[UserService-2] CreateCustomer: %v", err)
+		return err
+	}
+
+	messageparam := fmt.Sprintf("You have been registered in Sayur Project. Please login use: \n Email: %s\nPassword: %s", req.Email, passwordNoEncrypt)
+	go message.PublishMessage(userID,
+		req.Email,
+		messageparam,
+		utils.NOTIF_EMAIL_CREATE_CUSTOMER,
+		"Account Exists")
+
+	return nil
+}
+
+// DeleteCustomer implements IUserService.
+func (u *UserService) DeleteCustomer(ctx context.Context, customerID int) error {
+	return u.repo.DeleteCustomer(ctx, customerID)
+}
+
+// UpdateCustomer implements IUserService.
+func (u *UserService) UpdateCustomer(ctx context.Context, req entity.UserEntity) error {
+	passwordNoencrypt := ""
+	if req.Password != "" {
+		passwordNoencrypt = req.Password
+		password, err := conv.HashPassword(req.Password)
+		if err != nil {
+			log.Fatalf("[UserService-1] UpdateCustomer: %v", err)
+			return err
+		}
+
+		req.Password = password
+	}
+
+	err := u.repo.UpdateCustomer(ctx, req)
+	if err != nil {
+		log.Fatalf("[UserService-2] UpdateCustomer: %v", err)
+		return err
+	}
+
+	if passwordNoencrypt != "" {
+		messageparam := fmt.Sprintf("You're account has been updated. Please login use: \n Email: %s\nPassword: %s", req.Email, passwordNoencrypt)
+		go message.PublishMessage(req.ID,
+			req.Email,
+			messageparam,
+			utils.NOTIF_EMAIL_UPDATE_CUSTOMER,
+			"Updated Data")
+	}
+
+	return nil
+}
+
+// GetCustomerByID implements IUserService.
+func (u *UserService) GetCustomerByID(ctx context.Context, customerID int) (*entity.UserEntity, error) {
+	return u.repo.GetCustomerByID(ctx, customerID)
+}
+
+// GetCustomerAll implements IUserService.
+func (u *UserService) GetCustomerAll(ctx context.Context, query entity.QueryStringCustomer) ([]entity.UserEntity, int, int, error) {
+	return u.repo.GetCustomerAll(ctx, query)
 }
 
 // UpdateDataUser implements IUserService.

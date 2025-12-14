@@ -3,6 +3,8 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
+	"math"
 	"time"
 	"user-service/internal/core/domain/entity"
 	"user-service/internal/core/domain/models"
@@ -18,20 +20,215 @@ type IUserRepository interface {
 	UpdatePasswordByID(ctx context.Context, req entity.UserEntity) error
 	GetUserByID(ctx context.Context, userID int) (*entity.UserEntity, error)
 	UpdateDataUser(ctx context.Context, req entity.UserEntity) error
+
+	// modul user
+	GetCustomerAll(ctx context.Context, query entity.QueryStringCustomer) ([]entity.UserEntity, int, int, error)
+	GetCustomerByID(ctx context.Context, customerID int) (*entity.UserEntity, error)
+	CreateCustomer(ctx context.Context, req entity.UserEntity) (int, error)
+	UpdateCustomer(ctx context.Context, req entity.UserEntity) error
+	DeleteCustomer(ctx context.Context, customerID int) error
 }
 
 type UserRepository struct {
 	db *gorm.DB
 }
 
+// DeleteCustomer implements IUserRepository.
+func (u *UserRepository) DeleteCustomer(ctx context.Context, customerID int) error {
+	modelUser := models.User{}
+
+	if err := u.db.Where("id =?", customerID).First(&modelUser).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = errors.New("404")
+			log.Infof("[UserRepository-1] DeleteCustomer: User not found")
+			return err
+		}
+		log.Errorf("[UserRepository-2] DeleteCustomer: %v", err)
+		return err
+	}
+
+	if err := u.db.Delete(&modelUser).Error; err != nil {
+		log.Errorf("[UserRepository-3] DeleteCustomer: %v", err)
+		return err
+	}
+	return nil
+}
+
+// UpdateCustomer implements IUserRepository.
+func (u *UserRepository) UpdateCustomer(ctx context.Context, req entity.UserEntity) error {
+	modelRole := models.Role{}
+
+	if err := u.db.Where("id =?", req.RoleID).First(&modelRole).Error; err != nil {
+		log.Fatalf("[UserRepository-1] UpdateCustomer: %v", err)
+		return err
+	}
+
+	modelUser := models.User{}
+
+	if err := u.db.Where("id =?", req.ID).First(&modelUser).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = errors.New("404")
+			log.Infof("[UserRepository-2] UpdateCustomer: User not found")
+			return err
+		}
+		log.Errorf("[UserRepository-3] UpdateCustomer: %v", err)
+		return err
+	}
+
+	modelUser.Name = req.Name
+	modelUser.Email = req.Email
+	modelUser.Phone = req.Phone
+	modelUser.Roles = []models.Role{modelRole}
+
+	if req.Address != "" {
+		modelUser.Address = req.Address
+	}
+
+	if req.Lat != "" {
+		modelUser.Lat = req.Lat
+	}
+
+	if req.Lng != "" {
+		modelUser.Lng = req.Lng
+	}
+	if req.Photo != "" {
+		modelUser.Photo = req.Photo
+	}
+
+	if req.Password != "" {
+		modelUser.Password = req.Password
+	}
+
+	if err := u.db.Save(&modelUser).Error; err != nil {
+		log.Errorf("[UserRepository-4] UpdateCustomer: %v", err)
+		return err
+	}
+
+	return nil
+
+}
+
+// CreateCustomer implements IUserRepository.
+func (u *UserRepository) CreateCustomer(ctx context.Context, req entity.UserEntity) (int, error) {
+	modelRole := models.Role{}
+
+	if err := u.db.WithContext(ctx).Where("id = ?", req.RoleID).First(&modelRole).Error; err != nil {
+		log.Errorf("[UserRepository-1] CreateCustomer: %v", err)
+		return 0, err
+	}
+
+	userMdl := models.User{
+		Name:       req.Name,
+		Email:      req.Email,
+		Address:    req.Address,
+		Photo:      req.Photo,
+		Lat:        req.Lat,
+		Lng:        req.Lng,
+		Phone:      req.Phone,
+		Password:   req.Password,
+		Roles:      []models.Role{modelRole},
+		IsVerified: true,
+	}
+
+	if err := u.db.WithContext(ctx).Create(&userMdl).Error; err != nil {
+		log.Errorf("[UserRepository-2] CreateCustomer: %v", err)
+		return 0, err
+	}
+
+	return userMdl.ID, nil
+}
+
+// GetCustomerByID implements IUserRepository.
+func (u *UserRepository) GetCustomerByID(ctx context.Context, customerID int) (*entity.UserEntity, error) {
+	userMdl := models.User{}
+
+	if err := u.db.WithContext(ctx).Where("id = ?", customerID).Preload("Roles").First(&userMdl).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = errors.New("404")
+			log.Errorf("[UserRepository-1] GetCustomerByID: %v", err)
+			return nil, err
+		}
+		log.Errorf("[UserRepository-2] GetCustomerByID: %v", err)
+		return nil, err
+	}
+
+	roleId := 0
+
+	for _, role := range userMdl.Roles {
+		roleId = role.ID
+	}
+
+	return &entity.UserEntity{
+		ID:      userMdl.ID,
+		Name:    userMdl.Name,
+		Email:   userMdl.Email,
+		Address: userMdl.Address,
+		Photo:   userMdl.Photo,
+		Lat:     userMdl.Lat,
+		Lng:     userMdl.Lng,
+		Phone:   userMdl.Phone,
+		RoleID:  roleId,
+	}, nil
+}
+
+// GetCustomerAll implements IUserRepository.
+func (u *UserRepository) GetCustomerAll(ctx context.Context, query entity.QueryStringCustomer) ([]entity.UserEntity, int, int, error) {
+	modelUsers := []models.User{}
+	var countData int64
+
+	order := fmt.Sprintf("%s %s", query.OrderBy, query.OrderType)
+	offset := (query.Page - 1) * query.Limit
+
+	sqlMain := u.db.Preload("Roles", "name = ?", "Customer").
+		Where("name ILIKE ? OR email ILIKE ? OR phone ILIKE ?", "%"+query.Search+"%", "%"+query.Search+"%", "%"+query.Search+"%")
+
+	if err := sqlMain.Model(&models.User{}).Count(&countData).Error; err != nil {
+		log.Errorf("[UserRepository-1] GetCustomerAll: %v", err)
+		return nil, 0, 0, err
+	}
+
+	totalPage := int(math.Ceil(float64(countData) / float64(query.Limit)))
+
+	if err := sqlMain.Order(order).Limit(int(query.Limit)).Offset(int(offset)).Find(&modelUsers).Error; err != nil {
+		log.Errorf("[UserRepository-2] GetCustomerAll: %v", err)
+		return nil, 0, 0, err
+	}
+
+	if len(modelUsers) < 1 {
+		err := errors.New("404")
+		log.Errorf("[UserRepository-2] GetCustomerAll: No Customer found")
+		return nil, 0, 0, err
+	}
+
+	respEntities := []entity.UserEntity{}
+
+	for _, v := range modelUsers {
+		roleName := ""
+		for _, x := range v.Roles {
+			roleName = x.Name
+		}
+
+		respEntities = append(respEntities, entity.UserEntity{
+			ID:       v.ID,
+			Name:     v.Name,
+			Email:    v.Email,
+			RoleName: roleName,
+			Phone:    v.Phone,
+			Photo:    v.Photo,
+		})
+	}
+
+	return respEntities, int(countData), totalPage, nil
+}
+
 // UpdateDataUser implements IUserRepository.
 func (u *UserRepository) UpdateDataUser(ctx context.Context, req entity.UserEntity) error {
 	userMdl := models.User{
-		Name:      req.Name,
-		Email:     req.Email,
-		Address:   req.Address,
-		Phone:     req.Phone,
-		Photo:     req.Photo,
+		Name:    req.Name,
+		Email:   req.Email,
+		Address: req.Address,
+		Phone:   req.Phone,
+		Photo:   req.Photo,
 	}
 
 	if err := u.db.WithContext(ctx).Model(&models.User{}).Where("id = ?", req.ID).Updates(userMdl).Error; err != nil {
@@ -55,7 +252,7 @@ func (u *UserRepository) UpdateDataUser(ctx context.Context, req entity.UserEnti
 	}
 
 	return nil
-	
+
 }
 
 // GetUserByID implements IUserRepository.

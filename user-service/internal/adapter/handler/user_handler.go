@@ -4,12 +4,15 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"user-service/config"
 	"user-service/internal/adapter"
 	"user-service/internal/adapter/handler/request"
 	"user-service/internal/adapter/handler/response"
 	"user-service/internal/core/domain/entity"
 	"user-service/internal/core/service"
+
+	"user-service/utils/conv"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -24,18 +27,86 @@ type IUserHandler interface {
 	UpdatePassword(ctx echo.Context) error
 	GetProfileUser(c echo.Context) error
 	UpdateDataUser(ctx echo.Context) error
+
+	//modul user
+	GetCustomerAll(c echo.Context) error
+	GetCustomerByID(c echo.Context) error
+	CreateCustomer(c echo.Context) error
 }
 
 type userHandler struct {
 	UserService service.IUserService
 }
 
+// GetCustomerAll implements IUserHandler.
+
+
+func (u *userHandler) SignIn(c echo.Context) error {
+	var (
+		req      = request.SignInRequest{}
+		resp     = response.DefaultResponse{}
+		respSign = response.SignInResponse{}
+		ctx      = c.Request().Context()
+		err      error
+	)
+
+	if err = c.Bind(&req); err != nil {
+		log.Errorf("[UserHandler-1] SignIn : %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusUnprocessableEntity, resp)
+	}
+
+	if err = c.Validate(&req); err != nil {
+		log.Errorf("[UserHandler-1] SignIn : %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusUnprocessableEntity, resp)
+	}
+
+	reqEntity := entity.UserEntity{
+		Email:    req.Email,
+		Password: req.Password,
+	}
+
+	user, token, err := u.UserService.SignIn(ctx, reqEntity)
+
+	if err != nil {
+		if err.Error() == "404" {
+			log.Errorf("[UserHandler-1] SignIn : %v", "User not found")
+			resp.Message = "User not found"
+			resp.Data = nil
+			return c.JSON(http.StatusNotFound, resp)
+		}
+
+		log.Errorf("[UserHandler-1] SignIn : %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusUnprocessableEntity, resp)
+	}
+
+	respSign.Id = user.ID
+	respSign.Name = user.Name
+	respSign.Email = user.Email
+	respSign.Phone = user.Phone
+	respSign.Address = user.Address
+	respSign.Lat = user.Lat
+	respSign.Lng = user.Lng
+	respSign.AccessToken = token
+
+	resp.Message = "success"
+	resp.Data = respSign
+
+	return c.JSON(http.StatusOK, resp)
+
+}
+
 // UpdateDataUser implements IUserHandler.
 func (u *userHandler) UpdateDataUser(c echo.Context) error {
 	var (
-		req        = request.UpdateDataUserRequest{}
-		resp       = response.DefaultResponse{}
-		ctx        = c.Request().Context()
+		req         = request.UpdateDataUserRequest{}
+		resp        = response.DefaultResponse{}
+		ctx         = c.Request().Context()
 		jwtUserData = entity.JwtUserData{}
 	)
 
@@ -360,67 +431,225 @@ func (u *userHandler) CreateUserAccount(c echo.Context) error {
 
 }
 
-// SignIn implements IUserHandler.
-func (u *userHandler) SignIn(c echo.Context) error {
+
+func (u *userHandler) GetCustomerAll(c echo.Context) error {
 	var (
-		req      = request.SignInRequest{}
-		resp     = response.DefaultResponse{}
-		respSign = response.SignInResponse{}
-		ctx      = c.Request().Context()
-		err      error
+		resp = response.DefaultResponseWithPaginations{}
+		ctx  = c.Request().Context()
+		respUser = []response.CustomerListResponse{}
 	)
 
-	if err = c.Bind(&req); err != nil {
-		log.Errorf("[UserHandler-1] SignIn : %v", err)
-		resp.Message = err.Error()
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[UserHandler-1] GetCustomerAll: %s", "data token not found")
+		resp.Message = "data token not found"
 		resp.Data = nil
-		return c.JSON(http.StatusUnprocessableEntity, resp)
+		return c.JSON(http.StatusNotFound, resp)
 	}
 
-	if err = c.Validate(&req); err != nil {
-		log.Errorf("[UserHandler-1] SignIn : %v", err)
-		resp.Message = err.Error()
-		resp.Data = nil
-		return c.JSON(http.StatusUnprocessableEntity, resp)
+	search := c.QueryParam("search")
+	orderBy := "created_at"
+	if c.QueryParam("order_by") != "" {
+		orderBy = c.QueryParam("order_by")
 	}
 
-	reqEntity := entity.UserEntity{
-		Email:    req.Email,
-		Password: req.Password,
+	orderType := c.QueryParam("order_type")
+	if orderType != "asc" && orderType != "desc" {
+		orderType = "desc"
 	}
 
-	user, token, err := u.UserService.SignIn(ctx, reqEntity)
+	pageStr := c.QueryParam("page")
+	var page int = 1
+	if pageStr != "" {
+		page, _ = conv.StringToInt(pageStr)
+		if page <= 0 {
+			page = 1
+		}
+	}
 
+	limitStr := c.QueryParam("limit")
+	var limit int = 10
+	if limitStr != "" {
+		limit, _ = conv.StringToInt(limitStr)
+		if limit <= 0 {
+			limit = 10
+		}
+	}
+
+	reqEntity := entity.QueryStringCustomer{
+		Search:    search,
+		Page:      page,
+		Limit:     limit,
+		OrderBy:   orderBy,
+		OrderType: orderType,
+	}
+
+	results, countData, totalPages, err := u.UserService.GetCustomerAll(ctx, reqEntity)
 	if err != nil {
 		if err.Error() == "404" {
-			log.Errorf("[UserHandler-1] SignIn : %v", "User not found")
-			resp.Message = "User not found"
+			resp.Message = "Data not found"
 			resp.Data = nil
 			return c.JSON(http.StatusNotFound, resp)
 		}
 
-		log.Errorf("[UserHandler-1] SignIn : %v", err)
+		log.Errorf("[UserHandler-2] GetCustomerAll: %v", err)
 		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+
+	for _, val := range results {
+		respUser = append(respUser, response.CustomerListResponse{
+			ID:    val.ID,
+			Name:  val.Name,
+			Email: val.Email,
+			Photo: val.Photo,
+			Phone: val.Phone,
+		})
+	}
+
+	resp.Message = "Data retrieved successfully"
+	resp.Data = respUser
+	resp.Pagination = &response.Pagination{
+		Page:       page,
+		TotalCount: countData,
+		PerPage:    limit,
+		TotalPage:  totalPages,
+	}
+
+	return c.JSON(http.StatusOK, resp)
+}
+
+func (u *userHandler) GetCustomerByID(c echo.Context) error {
+	var (
+		resp = response.DefaultResponseWithPaginations{}
+		ctx  = c.Request().Context()
+		respUser = response.CustomerResponse{}
+	)
+
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[UserHandler-1] GetCustomerByID: %s", "data token not found")
+		resp.Message = "data token not found"
+		resp.Data = nil
+		return c.JSON(http.StatusNotFound, resp)
+	}
+
+	idStr := c.Param("id")
+	if idStr == "" {
+		log.Errorf("[UserHandler-2] GetCustomerByID: %s", "id invalid")
+		resp.Message = "id invalid"
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+
+	id, err := conv.StringToInt(idStr)
+	if err != nil {
+		log.Errorf("[UserHandler-2] GetCustomerByID: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+
+	result, err := u.UserService.GetCustomerByID(ctx, id)
+	if err != nil {
+		if err.Error() == "404" {
+			resp.Message = "Data not found"
+			resp.Data = nil
+			return c.JSON(http.StatusNotFound, resp)
+		}
+
+		log.Errorf("[UserHandler-3] GetCustomerByID: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+
+	respUser.ID = result.ID
+	respUser.RoleID = result.RoleID
+	respUser.Name = result.Name
+	respUser.Email = result.Email
+	respUser.Phone = result.Phone
+	respUser.Address = result.Address
+	respUser.Photo = result.Photo
+	respUser.Lat = result.Lat
+	respUser.Lng = result.Lng
+
+	resp.Message = "Data retrieved successfully"
+	resp.Data = respUser
+	resp.Pagination = nil
+
+	return c.JSON(http.StatusOK, resp)
+}
+
+func (u *userHandler) CreateCustomer(c echo.Context) error {
+	var (
+		resp = response.DefaultResponseWithPaginations{}
+		ctx  = c.Request().Context()
+		req  = request.CustomerRequest{}
+	)
+
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[UserHandler-1] CreateCustomer: %s", "data token not found")
+		resp.Message = "data token not found"
+		resp.Data = nil
+		return c.JSON(http.StatusNotFound, resp)
+	}
+
+	err := c.Bind(&req)
+	if err != nil {
+		log.Errorf("[UserHandler-2] CreateCustomer: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+
+	if err = c.Validate(&req); err != nil {
+		log.Errorf("[UserHandler-3] CreateCustomer: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+
+	if req.Password != req.PasswordConfirmation {
+		log.Infof("[UserHandler-4] CreateCustomer: %s", "password and confirm password does not match")
+		resp.Message = "password and confirm password does not match"
 		resp.Data = nil
 		return c.JSON(http.StatusUnprocessableEntity, resp)
 	}
 
-	respSign.Id = user.ID
-	respSign.Name = user.Name
-	respSign.Email = user.Email
-	respSign.Phone = user.Phone
-	respSign.Address = user.Address
-	respSign.Lat = user.Lat
-	respSign.Lng = user.Lng
-	respSign.AccessToken = token
+	latString := strconv.FormatFloat(req.Lat, 'g', -1, 64)
+	lngString := strconv.FormatFloat(req.Lng, 'g', -1, 64)
+
+	reqEntity := entity.UserEntity{
+		Name:     req.Name,
+		Email:    req.Email,
+		Password: req.Password,
+		Phone:    req.Phone,
+		Address:  req.Address,
+		Lat:      latString,
+		Lng:      lngString,
+		Photo:    req.Photo,
+		RoleID:   req.RoleID,
+	}
+
+	err = u.UserService.CreateCustomer(ctx, reqEntity)
+	if err != nil {
+		log.Errorf("[UserHandler-5] CreateCustomer: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
 
 	resp.Message = "success"
-	resp.Data = respSign
+	resp.Data = nil
+	resp.Pagination = nil
 
-	return c.JSON(http.StatusOK, resp)
-
+	return c.JSON(http.StatusCreated, resp)
 }
 
+// SignIn implements IUserHandler.
 func NewUserHandler(e *echo.Echo, userService service.IUserService, cfg *config.Config, jwtService service.IJWTService) IUserHandler {
 	userHandler := &userHandler{
 		UserService: userService,
@@ -442,6 +671,6 @@ func NewUserHandler(e *echo.Echo, userService service.IUserService, cfg *config.
 	authGroup := e.Group("/auth", mid.CheckToken())
 	authGroup.GET("/profile", userHandler.GetProfileUser)
 	authGroup.PUT("/profile", userHandler.UpdateDataUser)
-
+	
 	return userHandler
 }

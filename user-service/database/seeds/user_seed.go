@@ -21,16 +21,15 @@ func SeedUser(db *gorm.DB) {
 		db.FirstOrCreate(&adminRole)
 	}
 
-
 	user := models.User{
-		Name: "admin",
-		Email: "admin@example.com",
-		Password: passHash,
-		Phone: "08123456789",
-		Photo: "admin",
-		Address: "jl. xyz",
-		Lat: "0.0",
-		Lng: "0.0",
+		Name:       "admin",
+		Email:      "admin@example.com",
+		Password:   passHash,
+		Phone:      "08123456789",
+		Photo:      "admin",
+		Address:    "jl. xyz",
+		Lat:        "0.0",
+		Lng:        "0.0",
 		IsVerified: true,
 	}
 
@@ -39,5 +38,5 @@ func SeedUser(db *gorm.DB) {
 	if err := db.FirstOrCreate(&user).Error; err != nil {
 		log.Fatal(err)
 		return
-	} 
-}  
+	}
+}

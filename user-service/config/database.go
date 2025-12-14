@@ -13,7 +13,6 @@ type Postgres struct {
 	DB *gorm.DB
 }
 
-
 func (cfg Config) ConnectionPostgres() (*Postgres, error) {
 	dbConn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
 		cfg.Database.User,
@@ -35,7 +34,7 @@ func (cfg Config) ConnectionPostgres() (*Postgres, error) {
 		log.Println(err)
 		return nil, err
 	}
-	
+
 	sqlDB.SetMaxOpenConns(cfg.Database.MaxOpenConnections)
 	sqlDB.SetMaxIdleConns(cfg.Database.MaxIdleConnections)
 
@@ -56,7 +55,3 @@ func (p *Postgres) Close() {
 	}
 	db.Close()
 }
-
-
-
-

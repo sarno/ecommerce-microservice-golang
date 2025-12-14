@@ -6,6 +6,6 @@ type JwtUserData struct {
 	LoggedIn  bool   `json:"logged_in"`
 	Name      string `json:"name"`
 	Token     string `json:"token"`
-	UserID    int  `json:"user_id"`
+	UserID    int    `json:"user_id"`
 	RoleName  string `json:"role_name"`
 }

@@ -13,7 +13,7 @@ func SeedUserRole(db *gorm.DB) {
 			RoleID: 1,
 		},
 	}
-	
+
 	for _, userRole := range userRoles {
 		if err := db.FirstOrCreate(&userRole).Error; err != nil {
 			return

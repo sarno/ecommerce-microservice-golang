@@ -85,8 +85,8 @@ func (r *RoleRepository) GetAllRole(ctx context.Context, search string) ([]entit
 	roleEntity := []entity.RoleEntity{}
 	for _, v := range roleMdl {
 		roleEntity = append(roleEntity, entity.RoleEntity{
-			ID:    v.ID,
-			Name:  v.Name,
+			ID:   v.ID,
+			Name: v.Name,
 		})
 	}
 
