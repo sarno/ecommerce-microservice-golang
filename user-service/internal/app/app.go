@@ -31,6 +31,8 @@ func RunServer() {
 	}
 	defer db.Close()
 
+	redisClient := cfg.NewRedisClient()
+
 	storageHandler := storage.NewSupabase(cfg)
 
 	userRepo := repository.NewUserRepository(db.DB)
@@ -38,7 +40,7 @@ func RunServer() {
 	roleRepo := repository.NewRoleRepository(db.DB)
 
 	jwtService := service.NewJWTService(cfg)
-	userService := service.NewUserService(userRepo, cfg, jwtService, tokenRepo)
+	userService := service.NewUserService(userRepo, cfg, jwtService, tokenRepo, redisClient)
 	roleService := service.NewRoleService(roleRepo)
 
 	e := echo.New()
@@ -52,7 +54,7 @@ func RunServer() {
 		return c.String(200, "OK")
 	})
 
-	handler.NewUserHandler(e, userService, cfg, jwtService)
+	handler.NewUserHandler(e, userService, cfg, jwtService, redisClient)
 	handler.NewUploadImageHandler(e, cfg, storageHandler, jwtService)
 	handler.NewRoleHandler(e, roleService, cfg, jwtService)
 

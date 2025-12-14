@@ -7,15 +7,16 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 	"user-service/config"
 	"user-service/internal/adapter"
 	"user-service/internal/adapter/handler/request"
 	"user-service/internal/adapter/handler/response"
 	"user-service/internal/core/domain/entity"
 	"user-service/internal/core/service"
-
 	"user-service/utils/conv"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
@@ -40,10 +41,10 @@ type IUserHandler interface {
 
 type userHandler struct {
 	UserService service.IUserService
+	RedisClient *redis.Client
 }
 
 // GetCustomerAll implements IUserHandler.
-
 
 func (u *userHandler) SignIn(c echo.Context) error {
 	var (
@@ -435,11 +436,10 @@ func (u *userHandler) CreateUserAccount(c echo.Context) error {
 
 }
 
-
 func (u *userHandler) GetCustomerAll(c echo.Context) error {
 	var (
-		resp = response.DefaultResponseWithPaginations{}
-		ctx  = c.Request().Context()
+		resp     = response.DefaultResponseWithPaginations{}
+		ctx      = c.Request().Context()
 		respUser = []response.CustomerListResponse{}
 	)
 
@@ -480,6 +480,25 @@ func (u *userHandler) GetCustomerAll(c echo.Context) error {
 		}
 	}
 
+	// Membuat cache key yang unik berdasarkan parameter query
+	cacheKey := fmt.Sprintf("customers:%s:%s:%s:page_%d:limit_%d", search, orderBy, orderType, page, limit)
+
+	// Coba ambil dari Redis dulu
+	cachedData, err := u.RedisClient.Get(ctx, cacheKey).Result()
+	if err == nil {
+		// Cache hit!
+		log.Infof("Cache hit for key: %s", cacheKey)
+		c.Response().Header().Set("X-Cache-Status", "HIT")
+		c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSONCharsetUTF8)
+		return c.String(http.StatusOK, cachedData)
+	} else if err != redis.Nil {
+		// Jika ada error selain cache miss, log errornya tapi tetap lanjut ke db
+		log.Errorf("[UserHandler] GetCustomerAll: Redis error: %v", err)
+	}
+
+	// Cache miss atau error, ambil dari database
+	c.Response().Header().Set("X-Cache-Status", "MISS")
+	log.Infof("Cache miss for key: %s. Fetching from database.", cacheKey)
 	reqEntity := entity.QueryStringCustomer{
 		Search:    search,
 		Page:      page,
@@ -521,13 +540,24 @@ func (u *userHandler) GetCustomerAll(c echo.Context) error {
 		TotalPage:  totalPages,
 	}
 
+	// Simpan hasil ke Redis dengan expiration time 5 menit
+	jsonData, err := json.Marshal(resp)
+	if err != nil {
+		log.Errorf("[UserHandler] GetCustomerAll: Failed to marshal response for caching: %v", err)
+	} else {
+		err := u.RedisClient.Set(ctx, cacheKey, jsonData, 5*time.Minute).Err()
+		if err != nil {
+			log.Errorf("[UserHandler] GetCustomerAll: Failed to set cache in Redis: %v", err)
+		}
+	}
+
 	return c.JSON(http.StatusOK, resp)
 }
 
 func (u *userHandler) GetCustomerByID(c echo.Context) error {
 	var (
-		resp = response.DefaultResponseWithPaginations{}
-		ctx  = c.Request().Context()
+		resp     = response.DefaultResponseWithPaginations{}
+		ctx      = c.Request().Context()
 		respUser = response.CustomerResponse{}
 	)
 
@@ -667,7 +697,6 @@ func (u *userHandler) CreateCustomer(c echo.Context) error {
 
 	return c.JSON(http.StatusCreated, resp)
 }
-
 
 func (u *userHandler) UpdateCustomer(c echo.Context) error {
 	var (
@@ -838,9 +867,10 @@ func (u *userHandler) DeleteCustomer(c echo.Context) error {
 }
 
 // SignIn implements IUserHandler.
-func NewUserHandler(e *echo.Echo, userService service.IUserService, cfg *config.Config, jwtService service.IJWTService) IUserHandler {
+func NewUserHandler(e *echo.Echo, userService service.IUserService, cfg *config.Config, jwtService service.IJWTService, redisClient *redis.Client) IUserHandler {
 	userHandler := &userHandler{
 		UserService: userService,
+		RedisClient: redisClient,
 	}
 
 	e.Use(middleware.Recover())
@@ -864,6 +894,6 @@ func NewUserHandler(e *echo.Echo, userService service.IUserService, cfg *config.
 	authGroup := e.Group("/auth", mid.CheckToken())
 	authGroup.GET("/profile", userHandler.GetProfileUser)
 	authGroup.PUT("/profile", userHandler.UpdateDataUser)
-	
+
 	return userHandler
 }

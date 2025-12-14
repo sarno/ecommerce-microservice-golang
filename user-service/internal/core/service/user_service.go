@@ -13,6 +13,7 @@ import (
 	"user-service/utils"
 	"user-service/utils/conv"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
 	"github.com/labstack/gommon/log"
 )
@@ -35,10 +36,11 @@ type IUserService interface {
 }
 
 type UserService struct {
-	repo       repository.IUserRepository
-	cfg        *config.Config
-	jwtService IJWTService
-	repoToken  repository.IVerificationTokenRepository
+	repo        repository.IUserRepository
+	cfg         *config.Config
+	jwtService  IJWTService
+	repoToken   repository.IVerificationTokenRepository
+	redisClient *redis.Client
 }
 
 // CreateCustomer implements IUserService.
@@ -194,9 +196,7 @@ func (u *UserService) VerifyToken(ctx context.Context, token string) (*entity.Us
 		return nil, err
 	}
 
-	redisConn := config.NewConfig().NewRedisClient()
-
-	err = redisConn.Set(ctx, token, jsonData, time.Hour*23).Err()
+	err = u.redisClient.Set(ctx, token, jsonData, time.Hour*23).Err()
 	if err != nil {
 		log.Errorf("[UserService-4] VerifyToken: %v", err)
 		return nil, err
@@ -313,9 +313,7 @@ func (u *UserService) SignIn(ctx context.Context, req entity.UserEntity) (*entit
 		return nil, "", err
 	}
 
-
-	redisConn := config.NewConfig().NewRedisClient()
-	err = redisConn.Set(ctx, token, jsonData, time.Hour*23).Err()
+	err = u.redisClient.Set(ctx, token, jsonData, time.Hour*23).Err()
 
 	if err != nil {
 		log.Errorf("[UserService-4] SignIn: %v", err)
@@ -325,11 +323,12 @@ func (u *UserService) SignIn(ctx context.Context, req entity.UserEntity) (*entit
 	return user, token, nil
 }
 
-func NewUserService(repo repository.IUserRepository, cfg *config.Config, jwtService IJWTService, repoToken repository.IVerificationTokenRepository) IUserService {
+func NewUserService(repo repository.IUserRepository, cfg *config.Config, jwtService IJWTService, repoToken repository.IVerificationTokenRepository, redisClient *redis.Client) IUserService {
 	return &UserService{
-		repo:       repo,
-		cfg:        cfg,
-		jwtService: jwtService,
-		repoToken:  repoToken,
+		repo:        repo,
+		cfg:         cfg,
+		jwtService:  jwtService,
+		repoToken:   repoToken,
+		redisClient: redisClient,
 	}
 }
