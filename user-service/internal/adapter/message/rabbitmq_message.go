@@ -41,7 +41,6 @@ func PublishMessage(userId int, email, message, queueName, subject string) error
 	}
 
 	notifType := "EMAIL"
-
 	if queueName == utils.PUSH_NOTIF {
 		notifType = "PUSH"
 	}

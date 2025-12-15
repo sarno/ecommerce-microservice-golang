@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"notification-service/internal/core/domain/models"
 
 	"github.com/rs/zerolog/log"
 	"gorm.io/driver/postgres"
@@ -26,8 +25,6 @@ func (cfg Config) ConnectionPostgres() (*Postgres, error) {
 		log.Error().Err(err).Msg("[ConnectionPostgres-1] Failed to connect to database " + cfg.Database.Host)
 		return nil, err
 	}
-
-	db.AutoMigrate(&models.Notification{})
 
 	sqlDB, err := db.DB()
 	if err != nil {

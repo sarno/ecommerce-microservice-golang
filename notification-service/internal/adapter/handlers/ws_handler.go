@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"net/http"
+	"notification-service/config"
 	"notification-service/utils"
 	"strconv"
 
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 )
 
 // interface
@@ -52,6 +54,11 @@ func (w *WebSocketHandler) HandleWebSocket(c echo.Context) error {
 }
 
 
-func NewWebSocketHandler() IWebSocketHandler {
-	return &WebSocketHandler{}
+func NewWebSocketHandler(e *echo.Echo, cfg *config.Config) IWebSocketHandler {
+
+	wsHandler := &WebSocketHandler{}
+	e.Use(middleware.Recover())
+	e.GET("/ws", wsHandler.HandleWebSocket)
+
+	return wsHandler
 }
