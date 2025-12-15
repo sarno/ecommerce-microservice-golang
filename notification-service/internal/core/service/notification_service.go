@@ -14,11 +14,24 @@ import (
 type INotifService interface {
 	CreateNotification(ctx context.Context, notification *entities.NotificationEntity) error
 	SendPushNotification(ctx context.Context, notification entities.NotificationEntity)
+	GetAll(ctx context.Context, queryString entities.NotifyQueryString) ([]entities.NotificationEntity, int64, int64, error)
+	GetByID(ctx context.Context, notifID uint) (*entities.NotificationEntity, error)
+	MarkAsRead(ctx context.Context, notifID uint) error
 }
 
 // buat struct
 type NotifService struct {
 	notifRepository repositories.INotifRepository
+}
+
+// MarkAsRead implements [INotifService].
+func (n *NotifService) MarkAsRead(ctx context.Context, notifID uint) error {
+	return n.notifRepository.MarkAsRead(ctx, notifID)
+}
+
+// GetByID implements [INotifService].
+func (n *NotifService) GetByID(ctx context.Context, notifID uint) (*entities.NotificationEntity, error) {
+	return n.notifRepository.GetByID(ctx, notifID)
 }
 
 // SendPushNotification implements [INotifService].
@@ -47,12 +60,17 @@ func (n *NotifService) SendPushNotification(ctx context.Context, notification en
 	if err := n.notifRepository.MarkAsSent(notification.ID); err != nil {
 		log.Errorf("[SendPushNotification-3] Failed to mark notification as sent: %v", err)
 	}
-	
+
 }
 
 // CreateNotification implements [INotifService].
 func (n *NotifService) CreateNotification(ctx context.Context, notification *entities.NotificationEntity) error {
 	return n.notifRepository.CreateNotification(ctx, notification)
+}
+
+// GetAll implements [INotifService].
+func (n *NotifService) GetAll(ctx context.Context, queryString entities.NotifyQueryString) ([]entities.NotificationEntity, int64, int64, error) {
+	return n.notifRepository.GetAll(ctx, queryString)
 }
 
 // buat method

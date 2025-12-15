@@ -6,11 +6,12 @@ type App struct {
 	AppPort string `json:"app_port"`
 	AppEnv  string `json:"app_env"`
 
+	JwtSecretKey string `json:"jwt_secret_key"`
 }
 
 type Database struct {
 	Host               string `json:"host"`
-	Port               int    `json:"port"`
+	Port               string    `json:"port"`
 	User               string `json:"user"`
 	Password           string `json:"password"`
 	Name               string `json:"name"`
@@ -36,23 +37,36 @@ type Supabase struct {
 	Bucket string `json:"bucket"`
 }
 
+type EmailConfig struct {
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Sending  string `json:"sending"`
+	IsTLS    bool   `json:"is_tls"`
+}
+
 type Config struct {
 	App      App      `json:"app"`
 	Database Database `json:"database"`
 	Redis    Redis    `json:"redis"`
 	RabbitMQ RabbitMQ `json:"rabbitmq"`
 	Storage  Supabase `json:"storage"`
+	EmailConfig EmailConfig `json:"email_config"`
 }
+
 
 func NewConfig() *Config {
 	return &Config{
 		App: App{
-			AppPort:      viper.GetString("APP_PORT"),
-			AppEnv:       viper.GetString("APP_ENV"),
+			AppPort: viper.GetString("APP_PORT"),
+			AppEnv:  viper.GetString("APP_ENV"),
+
+			JwtSecretKey: viper.GetString("JWT_SECRET_KEY"),
 		},
 		Database: Database{
 			Host:               viper.GetString("DATABASE_HOST"),
-			Port:               viper.GetInt("DATABASE_PORT"),
+			Port:               viper.GetString("DATABASE_PORT"),
 			User:               viper.GetString("DATABASE_USER"),
 			Password:           viper.GetString("DATABASE_PASSWORD"),
 			Name:               viper.GetString("DATABASE_NAME"),
@@ -73,6 +87,14 @@ func NewConfig() *Config {
 			Url:    viper.GetString("SUPABASE_STORAGE_URL"),
 			Key:    viper.GetString("SUPABASE_STORAGE_KEY"),
 			Bucket: viper.GetString("SUPABASE_STORAGE_BUCKET"),
+		},
+		EmailConfig: EmailConfig{
+			Host:     viper.GetString("EMAIL_HOST"),
+			Port:     viper.GetInt("EMAIL_PORT"),
+			Username: viper.GetString("EMAIL_USERNAME"),
+			Password: viper.GetString("EMAIL_PASSWORD"),
+			Sending:  viper.GetString("EMAIL_SENDING"),
+			IsTLS:    viper.GetBool("EMAIL_IS_TLS"),
 		},
 	}
 }

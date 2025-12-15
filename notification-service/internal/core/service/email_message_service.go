@@ -2,6 +2,7 @@ package service
 
 import (
 	"crypto/tls"
+	"notification-service/config"
 
 	"github.com/go-mail/mail"
 	"github.com/labstack/gommon/log"
@@ -12,7 +13,7 @@ type IEmailService interface {
 
 // struct
 
-type emailMessage struct {
+type emailService struct {
 	Username string
 	Password string
 	Host     string
@@ -22,7 +23,7 @@ type emailMessage struct {
 }
 
 // SendEmail implements [IEmailMessage].
-func (e *emailMessage) SendEmail(to string, subject string, body string) error {
+func (e *emailService) SendEmail(to string, subject string, body string) error {
 	m := mail.NewMessage()
 	m.SetHeader("From", e.From)
 	m.SetHeader("To", to)
@@ -45,13 +46,13 @@ func (e *emailMessage) SendEmail(to string, subject string, body string) error {
 }
 
 // NewEmailMessage
-func NewEmailMessage(username string, password string, host string, port int, from string, isTls bool) IEmailService {
-	return &emailMessage{
-		Username: username,
-		Password: password,
-		Host:     host,
-		Port:     port,
-		From:     from,
-		IsTls:    isTls,
+func NewEmailService(cfg *config.Config) IEmailService {
+	return &emailService{
+		Username: cfg.EmailConfig.Username,
+		Password: cfg.EmailConfig.Password,
+		Host:     cfg.EmailConfig.Host,
+		Port:     cfg.EmailConfig.Port,
+		From:     cfg.EmailConfig.Sending,
+		IsTls:    cfg.EmailConfig.IsTLS,
 	}
 }

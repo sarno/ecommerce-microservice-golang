@@ -28,7 +28,7 @@ func PublishMessage(userId int, email, message, queueName, subject string) error
 
 	queue, err := ch.QueueDeclare(
 		queueName, // name
-		false,     // durable
+		true,      // durable
 		false,     // delete when unused
 		false,     // exclusive
 		false,     // no-wait

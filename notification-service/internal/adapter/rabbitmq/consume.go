@@ -22,38 +22,42 @@ type consumeRabbitMQ struct {
 // ConsumeMessage implements [IConsumeRabbitMQ].
 func (c *consumeRabbitMQ) ConsumeMessage(queueName string) error {
 	conn, err := config.NewConfig().NewRabbitMQ()
-
 	if err != nil {
-		log.Errorf("[ConsumeMessage-1] ConsumeMessage: %v", err)
+		log.Errorf("[ConsumeMessage-1] Failed to connect to RabbitMQ: %v", err)
 		return err
 	}
 
 	defer conn.Close()
-
 	ch, err := conn.Channel()
 	if err != nil {
-		log.Errorf("[ConsumeMessage-2] ConsumeMessage: %v", err)
+		log.Errorf("[ConsumeMessage-2] Failed to open a channel: %v", err) // More specific error message
 		return err
 	}
 
 	defer ch.Close()
 
-	msqs, err := ch.Consume(
-		queueName, // queue
-		"",        // consumer
-		true,      // auto-ack
+	// Declare the queue to ensure it exists
+	_, err = ch.QueueDeclare(
+		queueName, // name
+		true,      // durable
+		false,     // delete when unused
 		false,     // exclusive
-		false,     // no-local
 		false,     // no-wait
-		nil,       // args
+		nil,       // arguments
 	)
-
+	
 	if err != nil {
-		log.Errorf("[ConsumeMessage-3] ConsumeMessage: %v", err)
+		log.Errorf("[ConsumeMessage-Declare] Failed to declare queue '%s': %v", queueName, err)
 		return err
 	}
 
-	for msg := range msqs {
+	msgs, err := ch.Consume(queueName, "", true, false, false, false, nil)
+	if err != nil {
+		log.Errorf("[ConsumeMessage-3] Failed to consume messages from queue '%s': %v", queueName, err) // More specific error message
+		return err
+	}
+
+	for msg := range msgs {
 		var notificationEntity entities.NotificationEntity
 		log.Infof("Received a message: %s", msg.Body)
 		if err = json.Unmarshal(msg.Body, &notificationEntity); err != nil {
@@ -91,5 +95,8 @@ func (c *consumeRabbitMQ) SendNotification(notificationEntity entities.Notificat
 }
 
 func NewConsumeRabbitMQ(notificationService service.INotifService, emailService service.IEmailService) IConsumeRabbitMQ {
-	return &consumeRabbitMQ{}
+	return &consumeRabbitMQ{
+		notificationService: notificationService,
+		emailService:        emailService,
+	}
 }

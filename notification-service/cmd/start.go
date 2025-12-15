@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"notification-service/internal/app"
+
 	"github.com/spf13/cobra"
 )
 
@@ -8,7 +10,7 @@ var startCmd = &cobra.Command{
 	Use:   "notification:start",
 	Short: "Start notification",
 	Run: func(cmd *cobra.Command, args []string) {
-		// app.RunServer()
+		app.RunServer()
 	},
 }
 
