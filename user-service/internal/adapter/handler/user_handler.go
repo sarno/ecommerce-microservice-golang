@@ -874,7 +874,7 @@ func NewUserHandler(e *echo.Echo, userService service.IUserService, cfg *config.
 	}
 
 	e.Use(middleware.Recover())
-	e.POST("/sign-in", userHandler.SignIn)
+	e.POST("/signin", userHandler.SignIn)
 	e.POST("/signup", userHandler.CreateUserAccount)
 	e.POST("/forgot-password", userHandler.ForgotPassword)
 	e.GET("/verify-account", userHandler.VerifyAccount)
