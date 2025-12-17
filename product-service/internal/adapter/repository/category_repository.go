@@ -20,17 +20,50 @@ type ICategoryRepository interface {
 	CreateCategory(ctx context.Context, req entities.CategoryEntity) error
 	UpdateCategory(ctx context.Context, req entities.CategoryEntity) error
 	DeleteCategory(ctx context.Context, id int64) error
+
+	GetAllPublished(ctx context.Context) ([]entities.CategoryEntity, error)
 }
 
 type categoryRepository struct {
 	db *gorm.DB
 }
 
+// GetAllPublished implements [ICategoryRepository].
+func (c *categoryRepository) GetAllPublished(ctx context.Context) ([]entities.CategoryEntity, error) {
+	modelCategories := []models.Category{}
+
+	if err := c.db.Select("id, parent_id, name, icon, slug").Where("status = ?", true).Find(&modelCategories).Error; err != nil {
+		log.Errorf("[CategoryRepository-1] GetAllPublished: %v", err)
+		return nil, err
+	}
+
+	if len(modelCategories) == 0 {
+		err := errors.New("404")
+		log.Infof("[CategoryRepository-2] GetAllPublished: No category found")
+		return nil, err
+	}
+
+	entitiesCat := []entities.CategoryEntity{}
+	for _, val := range modelCategories {
+		entitiesCat = append(entitiesCat, entities.CategoryEntity{
+			ID:       val.ID,
+			ParentID: val.ParentID,
+			Name:     val.Name,
+			Icon:     val.Icon,
+			Status:   "Published",
+			Slug:     val.Slug,
+		})
+	}
+
+	return entitiesCat, nil
+
+}
+
 // CreateCategory implements [ICategoryRepository].
 func (c *categoryRepository) CreateCategory(ctx context.Context, req entities.CategoryEntity) error {
-	status  := true
+	status := true
 	if req.Status == entities.UnpublishedStatus {
-		status = false	
+		status = false
 	}
 
 	categoryMdl := models.Category{
@@ -122,7 +155,7 @@ func (c *categoryRepository) GetAll(ctx context.Context, query entities.QueryStr
 				Image:        prd.Image,
 			})
 		}
-		
+
 		status := entities.PublishedStatus
 		if !val.Status {
 			status = entities.UnpublishedStatus
@@ -218,9 +251,9 @@ func (c *categoryRepository) UpdateCategory(ctx context.Context, req entities.Ca
 		return err
 	}
 
-	status  := true
+	status := true
 	if req.Status == entities.UnpublishedStatus {
-		status = false	
+		status = false
 	}
 
 	categoryMdl.ParentID = req.ParentID

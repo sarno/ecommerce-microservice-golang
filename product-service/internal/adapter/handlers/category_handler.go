@@ -24,11 +24,79 @@ type ICategoryHandler interface {
 	GetBySlugAdmin(c echo.Context) error
 	Update(c echo.Context) error
 	Delete(c echo.Context) error
+
+	GetAllHome(c echo.Context) error
+	GetAllShop(c echo.Context) error
 }
 
 // struct
 type categoryHandler struct {
 	categoryService service.ICategoryService
+}
+
+// GetAllHome implements [ICategoryHandler].
+func (ch *categoryHandler) GetAllHome(c echo.Context) error {
+	var (
+		resp           = response.DefaultResponse{}
+		ctx            = c.Request().Context()
+		respCategories = []response.CategoryListHomeResponse{}
+	)
+
+	results, err := ch.categoryService.GetAllPublished(ctx)
+	if err != nil {
+		log.Errorf("[CategoryHandler-1] GetAllHome: %v", err)
+		if err.Error() == "404" {
+			resp.Message = "Data not found"
+			resp.Data = nil
+			return c.JSON(http.StatusNotFound, resp)
+		}
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+
+	for _, result := range results {
+		if result.ParentID == nil {
+			respCategories = append(respCategories, response.CategoryListHomeResponse{
+				Name: result.Name,
+				Icon: result.Icon,
+				Slug: result.Slug,
+			})
+		}
+	}
+
+	resp.Message = "success"
+	resp.Data = respCategories
+	return c.JSON(http.StatusOK, resp)
+
+}
+
+// GetAllShop implements [ICategoryHandler].
+func (ch *categoryHandler) GetAllShop(c echo.Context) error {
+	var (
+		resp           = response.DefaultResponse{}
+		ctx            = c.Request().Context()
+		respCategories = []response.CategoryListShopResponse{}
+	)	
+
+	results, err := ch.categoryService.GetAllPublished(ctx)
+	if err != nil {
+		log.Errorf("[CategoryHandler-1] GetAllShop: %v", err)
+		if err.Error() == "404" {
+			resp.Message = "Data not found"
+			resp.Data = nil
+			return c.JSON(http.StatusNotFound, resp)
+		}
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+
+	respCategories = RekursifCategory(results, nil, 0)
+
+	resp.Message = "success"
+	resp.Data = respCategories
+	return c.JSON(http.StatusOK, resp)
 }
 
 // Delete implements [ICategoryHandler].
@@ -360,6 +428,24 @@ func (ch *categoryHandler) GetByIdAdmin(c echo.Context) error {
 	return c.JSON(http.StatusOK, resp)
 }
 
+func RekursifCategory(results []entities.CategoryEntity, parentID *int64, level int) []response.CategoryListShopResponse {
+	var resps []response.CategoryListShopResponse
+
+	for _, category := range results {
+		if category.ParentID == parentID {
+			resps = append(resps, response.CategoryListShopResponse{
+				Name: category.Name,
+				Slug: category.Slug,
+			})
+
+			childCategories := RekursifCategory(results, &category.ID, level+1)
+			resps = append(resps, childCategories...)
+		}
+	}
+
+	return resps
+}
+
 func NewCategoryHandler(e *echo.Echo, categoryService service.ICategoryService, cfg *config.Config) ICategoryHandler {
 	categoryHandler := &categoryHandler{
 		categoryService: categoryService,
@@ -374,6 +460,11 @@ func NewCategoryHandler(e *echo.Echo, categoryService service.ICategoryService, 
 	adminGroup.PUT("/categories/:id", categoryHandler.Update)
 	adminGroup.GET("/categories/:slug/slug", categoryHandler.GetBySlugAdmin)
 	adminGroup.DELETE("/categories/:id", categoryHandler.Delete)
+
+	categoryApp := e.Group("/categories")
+	categoryApp.GET("/home", categoryHandler.GetAllHome)
+	categoryApp.GET("/shop", categoryHandler.GetAllShop)
+
 
 	return categoryHandler
 }

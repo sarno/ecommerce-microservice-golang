@@ -19,12 +19,19 @@ type ICategoryService interface {
 	CreateCategory(ctx context.Context, req entities.CategoryEntity) error
 	UpdateCategory(ctx context.Context, req entities.CategoryEntity) error
 	DeleteCategory(ctx context.Context, id int64) error
+
+	GetAllPublished(ctx context.Context) ([]entities.CategoryEntity, error)
 }
 
 //struct
 
 type categoryService struct {
 	repo repository.ICategoryRepository
+}
+
+// GetAllPublished implements [ICategoryService].
+func (c *categoryService) GetAllPublished(ctx context.Context) ([]entities.CategoryEntity, error) {
+	return c.repo.GetAllPublished(ctx)
 }
 
 // CreateCategory implements [ICategoryService].
@@ -59,7 +66,7 @@ func (c *categoryService) CreateCategory(ctx context.Context, req entities.Categ
 
 // DeleteCategory implements [ICategoryService].
 func (c *categoryService) DeleteCategory(ctx context.Context, id int64) error {
-	return  c.repo.DeleteCategory(ctx, id)
+	return c.repo.DeleteCategory(ctx, id)
 }
 
 // GetAll implements [ICategoryService].
@@ -83,7 +90,7 @@ func (c *categoryService) UpdateCategory(ctx context.Context, req entities.Categ
 	if err != nil {
 		log.Errorf("[CategoryService-1] EditCategory : %v", err)
 		return err
-	}	
+	}
 
 	if slug != result.Slug {
 		resSlug, err := c.repo.GetCategoryBySlug(ctx, slug)
