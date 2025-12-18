@@ -20,3 +20,15 @@ type ProductEntity struct {
 	Child        []ProductEntity `json:"child"`
 	CreatedAt    time.Time       `json:"created_at"`
 }
+
+type QueryStringProduct struct {
+	Search       string
+	Page         int
+	Limit        int
+	OrderBy      string
+	OrderType    string
+	CategorySlug string
+	StartPrice   int64
+	EndPrice     int64
+	Status       string
+}

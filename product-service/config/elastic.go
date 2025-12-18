@@ -6,7 +6,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v7"
 )
 
-func (cfg Config) initElastic() (*elasticsearch.Client, error) {
+func (cfg Config) InitElastic() (*elasticsearch.Client, error) {
 	config := elasticsearch.Config{
 		Addresses: []string{cfg.ElasticSearch.Host},
 	}

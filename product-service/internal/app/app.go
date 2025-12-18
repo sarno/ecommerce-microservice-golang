@@ -7,11 +7,13 @@ import (
 	"os/signal"
 	"product-service/config"
 	"product-service/internal/adapter/handlers"
+	"product-service/internal/adapter/message"
 	"product-service/internal/adapter/repository"
 	"product-service/internal/core/service"
-	"product-service/internal/utils/validator"
 	"syscall"
 	"time"
+
+	"product-service/utils/validator"
 
 	"github.com/go-playground/validator/v10/translations/en"
 	"github.com/labstack/echo/v4"
@@ -26,18 +28,21 @@ func RunServer() {
 		return
 	}
 
-	// elasticInit, err := cfg.InitElasticsearch()
-	// if err != nil {
-	// 	log.Fatalf("[RunServer-2] %v", err)
-	// 	return
-	// }
+	elasticInit, err := cfg.InitElastic()
+	if err != nil {
+		log.Fatalf("[RunServer-2] %v", err)
+		return
+	}
 
 	// storageHandler := storage.NewSupabase(cfg)
-	// publisherRabbitMQ := message.NewPublishRabbitMQ(cfg)
+
+	publisherRabbitMQ := message.NewPublishRabbitMQ(cfg)
 
 	categoryRepo := repository.NewCategoryRepository(db.DB)
-	
+	productRepo := repository.NewProductRepository(db.DB, elasticInit)
+
 	categoryService := service.NewCategoryService(categoryRepo)
+	productService := service.NewProductService(productRepo, categoryRepo, publisherRabbitMQ)
 
 	e := echo.New()
 	e.Use(middleware.CORS())
@@ -51,8 +56,9 @@ func RunServer() {
 	})
 
 	handlers.NewCategoryHandler(e, categoryService, cfg)
+	handlers.NewProductHandler(e, cfg, productService)
 
-		go func() {
+	go func() {
 		if cfg.App.AppPort == "" {
 			cfg.App.AppPort = os.Getenv("APP_PORT")
 		}

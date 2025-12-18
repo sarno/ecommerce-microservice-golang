@@ -5,7 +5,7 @@ import (
 	"errors"
 	"product-service/internal/adapter/repository"
 	"product-service/internal/core/domain/entities"
-	"product-service/internal/utils/conv"
+	"product-service/utils/conv"
 
 	"github.com/labstack/gommon/log"
 )

@@ -9,7 +9,7 @@ import (
 	"product-service/internal/adapter/handlers/response"
 	"product-service/internal/core/domain/entities"
 	"product-service/internal/core/service"
-	"product-service/internal/utils/conv"
+	"product-service/utils/conv"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"

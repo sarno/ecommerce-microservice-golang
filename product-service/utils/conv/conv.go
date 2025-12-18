@@ -20,3 +20,10 @@ func GenerateSlug(title string) string {
 
 	return slug
 }
+
+func Int64PointerToInt64(num *int64) int64 {
+	if num != nil {
+		return *num
+	}
+	return 0
+}
