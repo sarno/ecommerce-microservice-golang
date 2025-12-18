@@ -85,7 +85,7 @@ func StartUpdateStockConsumer() {
 			log.Errorf("[StartUpdateStockConsumer-8] Failed to update stock: %v", err)
 			continue
 		}
-		log.Printf("Mengurangi stok produk %s sebanyak %d", orderItem.ProductID, orderItem.Quantity)
+		log.Printf("Mengurangi stok produk %d sebanyak %d", orderItem.ProductID, orderItem.Quantity)
 	}
 
 	

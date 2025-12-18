@@ -35,7 +35,7 @@ type RabbitMQ struct {
 }
 
 type Supabase struct {
-	Url    string `json:"url"`
+	URL    string `json:"url"`
 	Key    string `json:"key"`
 	Bucket string `json:"bucket"`
 }
@@ -92,7 +92,7 @@ func NewConfig() *Config {
 			Password: viper.GetString("RABBITMQ_PASSWORD"),
 		},
 		Storage: Supabase{
-			Url:    viper.GetString("SUPABASE_STORAGE_URL"),
+			URL:    viper.GetString("SUPABASE_STORAGE_URL"),
 			Key:    viper.GetString("SUPABASE_STORAGE_KEY"),
 			Bucket: viper.GetString("SUPABASE_STORAGE_BUCKET"),
 		},

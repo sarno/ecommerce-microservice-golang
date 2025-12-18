@@ -76,7 +76,8 @@ func StartDeleteOrderConsumer() {
 				log.Errorf("[StartDeleteOrderConsumer-8] Error indexing to Elasticsearch: %v", err)
 				continue
 			}
-			defer res.Body.Close()
+			
+			res.Body.Close()
 		}
 	}()
 
@@ -163,9 +164,9 @@ func StartConsumer() {
 				log.Errorf("[StartConsumer-8] Error indexing to Elasticsearch: %v", err)
 				continue
 			}
-			defer res.Body.Close()
-
+			
 			body, _ := io.ReadAll(res.Body)
+			res.Body.Close()
 			log.Infof("[StartConsumer-9] Product %d berhasil diindex ke Elasticsearch %v", product.ID, string(body))	
 		}
 	}()

@@ -9,6 +9,7 @@ import (
 	"product-service/internal/adapter/handlers"
 	"product-service/internal/adapter/message"
 	"product-service/internal/adapter/repository"
+	"product-service/internal/adapter/storage"
 	"product-service/internal/core/service"
 	"syscall"
 	"time"
@@ -34,12 +35,13 @@ func RunServer() {
 		return
 	}
 
-	// storageHandler := storage.NewSupabase(cfg)
+	storageHandler := storage.NewSupabase(cfg)
 
 	publisherRabbitMQ := message.NewPublishRabbitMQ(cfg)
 
 	categoryRepo := repository.NewCategoryRepository(db.DB)
 	productRepo := repository.NewProductRepository(db.DB, elasticInit)
+	
 
 	categoryService := service.NewCategoryService(categoryRepo)
 	productService := service.NewProductService(productRepo, categoryRepo, publisherRabbitMQ)
@@ -57,6 +59,7 @@ func RunServer() {
 
 	handlers.NewCategoryHandler(e, categoryService, cfg)
 	handlers.NewProductHandler(e, cfg, productService)
+	handlers.NewUploadImage(e, cfg, storageHandler)
 
 	go func() {
 		if cfg.App.AppPort == "" {
