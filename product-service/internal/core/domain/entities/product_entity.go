@@ -32,3 +32,8 @@ type QueryStringProduct struct {
 	EndPrice     int64
 	Status       string
 }
+
+type PublishOrderItemEntity struct {
+	ProductID int64 `json:"product_id"`
+	Quantity  int64 `json:"quantity"`
+}

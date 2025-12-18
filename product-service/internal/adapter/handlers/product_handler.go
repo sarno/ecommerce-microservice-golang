@@ -9,6 +9,7 @@ import (
 	"product-service/internal/core/domain/entities"
 	"product-service/internal/core/service"
 	"product-service/utils/conv"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -22,11 +23,155 @@ type IProductHandler interface {
 	GetByIDAdmin(c echo.Context) error
 	EditAdmin(c echo.Context) error
 	DeleteAdmin(c echo.Context) error
+
+	GetAllHome(c echo.Context) error
+	GetAllShop(c echo.Context) error
 }
 
 // struct
 type productHandler struct {
 	productService service.IProductService
+}
+
+// GetAllShop implements [IProductHandler].
+func (p *productHandler) GetAllShop(c echo.Context) error {
+	var (
+		resp      = response.DefaultResponseWithPaginations{}
+		ctx       = c.Request().Context()
+		respLists = []response.ProductHomeListResponse{}
+	)
+
+	orderBy := "created_at"
+	orderType := "desc"
+	if c.QueryParam("orderBy") != "" {
+		if c.QueryParam("orderBy") == "price_asc" {
+			orderBy = "reguler_price"
+			orderType = "asc"
+		}
+		if c.QueryParam("orderBy") == "price_desc" {
+			orderBy = "reguler_price"
+			orderType = "desc"
+		}
+
+		if c.QueryParam("orderBy") == "newest" {
+			orderBy = "id"
+			orderType = "desc"
+		}
+	}
+	var page int64 = 1
+	if c.QueryParam("page") != "" {
+		page, _ = conv.StringToInt64(c.QueryParam("page"))
+	}
+	var perPage int64 = 10
+	if c.QueryParam("limit") != "" {
+		perPage, _ = conv.StringToInt64(c.QueryParam("limit"))
+	}
+	var startPrice int64 = 0
+	var endPrice int64 = 0
+	if c.QueryParam("price") != "" {
+		price := strings.Split(c.QueryParam("price"), " - ")
+		startPrice, _ = conv.StringToInt64(price[0])
+		endPrice, _ = conv.StringToInt64(price[1])
+	}
+	reqEntity := entities.QueryStringProduct{
+		CategorySlug: c.QueryParam("category"),
+		OrderBy:      orderBy,
+		OrderType:    orderType,
+		Page:         int(page),
+		Limit:        int(perPage),
+		StartPrice:   startPrice,
+		EndPrice:     endPrice,
+	}
+
+	if c.QueryParam("search") != "" {
+		reqEntity.Search = c.QueryParam("search")
+	}
+
+	results, totalData, totalPage, err := p.productService.SearchProducts(ctx, reqEntity)
+	if err != nil {
+		log.Errorf("[ProductHandler-1] GetAllHome: %v", err)
+		if err.Error() == "404" {
+			resp.Message = "Data not found"
+			resp.Data = nil
+			return c.JSON(http.StatusNotFound, resp)
+		}
+
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+
+	for _, result := range results {
+		respLists = append(respLists, response.ProductHomeListResponse{
+			ID:           result.ID,
+			ProductName:  result.Name,
+			ProductImage: result.Image,
+			SalePrice:    int64(result.SalePrice),
+			RegulerPrice: int64(result.RegulerPrice),
+			CategoryName: result.CategoryName,
+		})
+	}
+
+	resp.Message = "success"
+	resp.Data = respLists
+	resp.Pagination = &response.Pagination{
+		Page:       page,
+		TotalPage:  totalPage,
+		TotalCount: totalData,
+		PerPage:    perPage,
+	}
+	return c.JSON(http.StatusOK, resp)
+
+}
+
+// GetAllHome implements [IProductHandler].
+func (p *productHandler) GetAllHome(c echo.Context) error {
+	var (
+		resp      = response.DefaultResponse{}
+		ctx       = c.Request().Context()
+		respLists = []response.ProductHomeListResponse{}
+	)
+
+	orderBy := "created_at"
+	orderType := "desc"
+	var page int64 = 1
+	var perPage int64 = 5
+
+	reqEntity := entities.QueryStringProduct{
+		OrderBy:   orderBy,
+		OrderType: orderType,
+		Page:      int(page),
+		Limit:     int(perPage),
+	}
+
+	results, _, _, err := p.productService.GetAll(ctx, reqEntity)
+	if err != nil {
+		log.Errorf("[ProductHandler-1] GetAllHome: %v", err)
+		if err.Error() == "404" {
+			resp.Message = "Data not found"
+			resp.Data = nil
+			return c.JSON(http.StatusNotFound, resp)
+		}
+
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+
+	for _, result := range results {
+		respLists = append(respLists, response.ProductHomeListResponse{
+			ID:           result.ID,
+			ProductName:  result.Name,
+			ProductImage: result.Image,
+			SalePrice:    int64(result.SalePrice),
+			RegulerPrice: int64(result.RegulerPrice),
+			CategoryName: result.CategoryName,
+		})
+	}
+
+	resp.Message = "success"
+	resp.Data = respLists
+	return c.JSON(http.StatusOK, resp)
 }
 
 // DeleteAdmin implements [IProductHandler].
@@ -442,6 +587,10 @@ func NewProductHandler(e *echo.Echo, cfg *config.Config, productService service.
 	adminGroup.GET("/products/:id", productHandler.GetByIDAdmin)
 	adminGroup.PUT("/products/:id", productHandler.EditAdmin)
 	adminGroup.DELETE("/products/:id", productHandler.DeleteAdmin)
+
+	homeProduct := e.Group("/products")
+	homeProduct.GET("/home", productHandler.GetAllHome)
+	homeProduct.GET("/shop", productHandler.GetAllShop)
 
 	return productHandler
 }

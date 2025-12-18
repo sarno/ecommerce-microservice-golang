@@ -57,6 +57,7 @@ func (p *PublishRabbitMQ) DeleteProductFromQueue(productID int64) error {
 		amqp.Publishing{
 			ContentType: "application/json",
 			Body:        data,
+			DeliveryMode: amqp.Persistent,
 		},
 	)
 
@@ -106,8 +107,9 @@ func (p *PublishRabbitMQ) PublishProductToQueue(product entities.ProductEntity) 
 		false,
 		false,
 		amqp.Publishing{
-			ContentType: "application/json",
-			Body:        data,
+			ContentType:  "application/json",
+			Body:         data,
+			DeliveryMode: amqp.Persistent,
 		},
 	)
 	if err != nil {

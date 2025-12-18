@@ -17,6 +17,8 @@ type IProductService interface {
 	Create(ctx context.Context, req entities.ProductEntity) error
 	Update(ctx context.Context, req entities.ProductEntity) error
 	Delete(ctx context.Context, productID int64) error
+
+	SearchProducts(ctx context.Context, query entities.QueryStringProduct) ([]entities.ProductEntity, int64, int64, error)
 }
 
 // struct
@@ -26,6 +28,11 @@ type productService struct {
 	publisherRabbitMQ message.IPublishRabbitMQ
 }
 
+// SearchProducts implements [IProductService].
+func (p *productService) SearchProducts(ctx context.Context, query entities.QueryStringProduct) ([]entities.ProductEntity, int64, int64, error) {
+	return p.repo.SearchProducts(ctx, query)
+}
+
 // Delete implements [IProductService].
 func (p *productService) Delete(ctx context.Context, productID int64) error {
 	err := p.repo.Delete(ctx, productID)
@@ -33,13 +40,13 @@ func (p *productService) Delete(ctx context.Context, productID int64) error {
 		log.Errorf("[ProductService-1] Delete: %v", err)
 		return err
 	}
-	
+
 	if err := p.publisherRabbitMQ.DeleteProductFromQueue(productID); err != nil {
 		log.Errorf("[ProductService-2] Delete: %v", err)
 	}
 
 	return nil
-	
+
 }
 
 // Update implements [IProductService].
