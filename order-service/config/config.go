@@ -2,6 +2,7 @@ package config
 
 import "github.com/spf13/viper"
 
+
 type App struct {
 	AppPort string `json:"app_port"`
 	AppEnv  string `json:"app_env"`
@@ -10,6 +11,9 @@ type App struct {
 	JwtExpire    int    `json:"jwt_expire"`
 	JwtIssuer    string `json:"jwt_issuer"`
 
+	UserServiceUrl    string `json:"user_service_url"`
+	ProductServiceUrl string `json:"product_service_url"`
+	ServerTimeOut     int    `json:"server_timeout"`
 }
 
 type Database struct {
@@ -72,7 +76,9 @@ func NewConfig() *Config {
 			JwtExpire:    viper.GetInt("JWT_EXPIRATION"),
 			JwtIssuer:    viper.GetString("JWT_ISSUER"),
 
-			
+			UserServiceUrl:    viper.GetString("USER_SERVICE_URL"),
+			ProductServiceUrl: viper.GetString("PRODUCT_SERVICE_URL"),
+			ServerTimeOut:     viper.GetInt("SERVER_TIMEOUT"),
 		},
 		Database: Database{
 			Host:               viper.GetString("DATABASE_HOST"),
