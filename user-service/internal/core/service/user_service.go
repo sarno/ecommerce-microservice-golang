@@ -45,21 +45,13 @@ type UserService struct {
 
 // CreateCustomer implements IUserService.
 func (u *UserService) CreateCustomer(ctx context.Context, req entity.UserEntity) error {
-	passwordNoEncrypt := req.Password
-	password, err := conv.HashPassword(passwordNoEncrypt)
-	if err != nil {
-		log.Errorf("[UserService-1] CreateCustomer: %v", err)
-		return err
-	}
-
-	req.Password = password
 	userID, err := u.repo.CreateCustomer(ctx, req)
 	if err != nil {
 		log.Errorf("[UserService-2] CreateCustomer: %v", err)
 		return err
 	}
 
-	messageparam := fmt.Sprintf("You have been registered in Sayur Project. Please login use: \n Email: %s\nPassword: %s", req.Email, passwordNoEncrypt)
+	messageparam := fmt.Sprintf("You have been registered in Sayur Project. Please login with the email and password you provided.")
 	go message.PublishMessage(userID,
 		req.Email,
 		messageparam,
@@ -76,31 +68,22 @@ func (u *UserService) DeleteCustomer(ctx context.Context, customerID int) error 
 
 // UpdateCustomer implements IUserService.
 func (u *UserService) UpdateCustomer(ctx context.Context, req entity.UserEntity) error {
-	passwordNoencrypt := ""
-	if req.Password != "" {
-		passwordNoencrypt = req.Password
-		password, err := conv.HashPassword(req.Password)
-		if err != nil {
-			log.Errorf("[UserService-1] UpdateCustomer: %v", err)
-			return err
-		}
-
-		req.Password = password
-	}
-
+	// The password from the handler is already hashed.
+	// If it's empty, the repository will ignore it.
+	// If it's not empty, we pass the hash directly.
 	err := u.repo.UpdateCustomer(ctx, req)
 	if err != nil {
 		log.Errorf("[UserService-2] UpdateCustomer: %v", err)
 		return err
 	}
 
-	if passwordNoencrypt != "" {
-		messageparam := fmt.Sprintf("You're account has been updated. Please login use: \n Email: %s\nPassword: %s", req.Email, passwordNoencrypt)
+	if req.Password != "" {
+		messageparam := fmt.Sprintf("Your account password has been updated. Please login using your new password.")
 		go message.PublishMessage(req.ID,
 			req.Email,
 			messageparam,
 			utils.NOTIF_EMAIL_UPDATE_CUSTOMER,
-			"Updated Data")
+			"Password Updated")
 	}
 
 	return nil

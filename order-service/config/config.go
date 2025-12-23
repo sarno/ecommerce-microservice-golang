@@ -14,6 +14,10 @@ type App struct {
 	UserServiceUrl    string `json:"user_service_url"`
 	ProductServiceUrl string `json:"product_service_url"`
 	ServerTimeOut     int    `json:"server_timeout"`
+
+	LatitudeRef  string `json:"latitude_ref"`
+	LongitudeRef string `json:"longitude_ref"`
+	MaxDistance  int    `json:"max_distance"`
 }
 
 type Database struct {
@@ -53,6 +57,7 @@ type PublisherName struct {
 	ProductPublish     string `json:"product_publish"`
 	ProductDelete      string `json:"product_delete"`
 	ProductToOrder     string `json:"product_to_order"`
+	OrderPublish            string `json:"order_publish"`
 }
 
 type Config struct {
@@ -74,11 +79,15 @@ func NewConfig() *Config {
 			AppEnv:       viper.GetString("APP_ENV"),
 			JwtSecretKey: viper.GetString("JWT_SECRET"),
 			JwtExpire:    viper.GetInt("JWT_EXPIRATION"),
-			JwtIssuer:    viper.GetString("JWT_ISSUER"),
+			JwtIssuer:    viper.GetString("JWT_ISSUER"), 
 
 			UserServiceUrl:    viper.GetString("USER_SERVICE_URL"),
 			ProductServiceUrl: viper.GetString("PRODUCT_SERVICE_URL"),
 			ServerTimeOut:     viper.GetInt("SERVER_TIMEOUT"),
+
+			LatitudeRef:  viper.GetString("LATITUDE_REF"),
+			LongitudeRef: viper.GetString("LONGITUDE_REF"),
+			MaxDistance:  viper.GetInt("MAX_DISTANCE"),
 		},
 		Database: Database{
 			Host:               viper.GetString("DATABASE_HOST"),
@@ -112,6 +121,7 @@ func NewConfig() *Config {
 			ProductPublish:     viper.GetString("PRODUCT_PUBLISH_NAME"),
 			ProductDelete:      viper.GetString("PRODUCT_DELETE"),
 			ProductToOrder:     viper.GetString("PRODUCT_TO_ORDER"),
+			OrderPublish:       viper.GetString("ORDER_PUBLISH_NAME"),
 		},
 	}
 }

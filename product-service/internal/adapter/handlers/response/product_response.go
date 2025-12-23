@@ -38,3 +38,26 @@ type ProductChildResponse struct {
 	RegulerPrice int64 `json:"reguler_price"`
 	SalePrice    int64 `json:"sale_price"`
 }
+
+type ProductHomeDetailResponse struct {
+	ID           int64                      `json:"id"`
+	ProductName  string                     `json:"product_name"`
+	CategoryName string                     `json:"category_name"`
+	Description  string                     `json:"description"`
+	Unit         string                     `json:"unit"`
+	ProductImage string                     `json:"image"`
+	SalePrice    int64                      `json:"sale_price"`
+	RegulerPrice int64                      `json:"reguler_price"`
+	Stock        int                        `json:"stock"`
+	Weight       int                        `json:"weight"`
+	Child        []ProductChildHomeResponse `json:"child"`
+}
+
+type ProductChildHomeResponse struct {
+	ID           int64  `json:"id"`
+	Weight       int    `json:"weight"`
+	Stock        int    `json:"stock"`
+	RegulerPrice int64  `json:"reguler_price"`
+	SalePrice    int64  `json:"sale_price"`
+	Image        string `json:"image"`
+}
