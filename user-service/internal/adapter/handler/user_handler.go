@@ -37,11 +37,117 @@ type IUserHandler interface {
 	CreateCustomer(c echo.Context) error
 	UpdateCustomer(c echo.Context) error
 	DeleteCustomer(c echo.Context) error
+	GetUsersByIDs(c echo.Context) error
 }
 
 type userHandler struct {
 	UserService service.IUserService
 	RedisClient *redis.Client
+}
+
+// GetUsersByIDs implements [IUserHandler].
+func (u *userHandler) GetUsersByIDs(c echo.Context) error {
+	var (
+		resp     = response.DefaultResponse{}
+		ctx      = c.Request().Context()
+		respUser []response.CustomerListResponse
+	)
+
+	// Admin access is assumed for this bulk endpoint
+	userToken := c.Get("user").(string)
+	if userToken == "" {
+		log.Errorf("[UserHandler-1] GetUsersByIDs: %s", "data token not found")
+		resp.Message = "data token not found"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
+
+	idsStr := c.QueryParam("ids")
+	if idsStr == "" {
+		log.Errorf("[UserHandler-2] GetUsersByIDs: %s", "missing 'ids' query parameter")
+		resp.Message = "missing 'ids' query parameter"
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+
+	// Parse comma-separated IDs
+	idStrings := strings.Split(idsStr, ",")
+	userIDs := make([]int, 0, len(idStrings))
+	for _, s := range idStrings {
+		id, err := strconv.Atoi(s)
+		if err != nil {
+			log.Errorf("[UserHandler-3] GetUsersByIDs: invalid ID format '%s': %v", s, err)
+			resp.Message = fmt.Sprintf("invalid ID format: %s", s)
+			resp.Data = nil
+			return c.JSON(http.StatusBadRequest, resp)
+		}
+		userIDs = append(userIDs, id)
+	}
+
+	// Buat cache key yang unik berdasarkan parameter query
+	cacheKey := fmt.Sprintf("users_by_ids:%s", idsStr)
+
+	// Coba ambil dari Redis dulu
+	cachedData, err := u.RedisClient.Get(ctx, cacheKey).Result()
+	if err == nil {
+		// Cache hit!
+		log.Infof("Cache hit for key: %s", cacheKey)
+		c.Response().Header().Set("X-Cache-Status", "HIT")
+		c.Response().Header().Set(echo.HeaderContentType, echo.MIMEApplicationJSONCharsetUTF8)
+		return c.String(http.StatusOK, cachedData)
+	} else if err != redis.Nil {
+		// Jika ada error selain cache miss, log errornya tapi tetap lanjut ke db
+		log.Errorf("[UserHandler] GetUsersByIDs: Redis error: %v", err)
+	}
+
+	// Cache miss atau error, ambil dari database
+	c.Response().Header().Set("X-Cache-Status", "MISS")
+	log.Infof("Cache miss for key: %s. Fetching from database.", cacheKey)
+
+	results, err := u.UserService.GetUsersByIDs(ctx, userIDs)
+	if err != nil {
+		if err.Error() == "404" {
+			resp.Message = "Users not found"
+			resp.Data = nil
+			return c.JSON(http.StatusNotFound, resp)
+		}
+		log.Errorf("[UserHandler-4] GetUsersByIDs: %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+
+	if len(results) == 0 {
+		resp.Message = "No users found for provided IDs"
+		resp.Data = []response.CustomerListResponse{} // Return empty array instead of null
+		return c.JSON(http.StatusOK, resp)
+	}
+
+	for _, val := range results {
+		respUser = append(respUser, response.CustomerListResponse{
+			ID:    val.ID,
+			Name:  val.Name,
+			Email: val.Email,
+			Photo: val.Photo,
+			Phone: val.Phone,
+		})
+	}
+
+	resp.Message = "Data retrieved successfully"
+	resp.Data = respUser
+
+	// Simpan hasil ke Redis dengan expiration time 5 menit
+	jsonData, err := json.Marshal(resp)
+	if err != nil {
+		log.Errorf("[UserHandler] GetUsersByIDs: Failed to marshal response for caching: %v", err)
+	} else {
+		err := u.RedisClient.Set(ctx, cacheKey, jsonData, 5*time.Minute).Err()
+		if err != nil {
+			log.Errorf("[UserHandler] GetUsersByIDs: Failed to set cache in Redis: %v", err)
+		}
+	}
+
+	return c.JSON(http.StatusOK, resp)
 }
 
 // GetCustomerAll implements IUserHandler.
@@ -887,6 +993,7 @@ func NewUserHandler(e *echo.Echo, userService service.IUserService, cfg *config.
 	adminGroup.PUT("/customers/:id", userHandler.UpdateCustomer)
 	adminGroup.GET("/customers/:id", userHandler.GetCustomerByID)
 	adminGroup.DELETE("/customers/:id", userHandler.DeleteCustomer)
+	adminGroup.GET("/customers/bulk", userHandler.GetUsersByIDs) // Tambahkan ini
 	adminGroup.GET("/check", func(c echo.Context) error {
 		return c.String(200, "OK")
 	})

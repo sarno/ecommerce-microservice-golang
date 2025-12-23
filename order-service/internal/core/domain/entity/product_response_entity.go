@@ -8,7 +8,7 @@ type ProductHttpClientResponse struct {
 }
 
 type ProductResponseEntity struct {
-	ID            int                          `json:"id"`
+	ID            int64                        `json:"id"`
 	ProductName   string                       `json:"product_name"`
 	ParentID      int                          `json:"parent_id"`
 	ProductImage  string                       `json:"product_image"`
@@ -21,6 +21,7 @@ type ProductResponseEntity struct {
 	Weight        int                          `json:"weight"`
 	Stock         int                          `json:"stock"`
 	Child         []ChildProductResponseEntity `json:"child"`
+	ProductID     int64                        `json:"product_id"`
 }
 
 type ChildProductResponseEntity struct {

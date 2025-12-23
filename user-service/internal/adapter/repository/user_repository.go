@@ -27,10 +27,54 @@ type IUserRepository interface {
 	CreateCustomer(ctx context.Context, req entity.UserEntity) (int, error)
 	UpdateCustomer(ctx context.Context, req entity.UserEntity) error
 	DeleteCustomer(ctx context.Context, customerID int) error
+	GetUsersByIDs(ctx context.Context, userIDs []int) ([]entity.UserEntity, error)
 }
 
 type UserRepository struct {
 	db *gorm.DB
+}
+
+func (u *UserRepository) GetUsersByIDs(ctx context.Context, userIDs []int) ([]entity.UserEntity, error) {
+	if len(userIDs) == 0 {
+		return []entity.UserEntity{}, nil
+	}
+
+	modelUsers := []models.User{}
+	// Gunakan GORM untuk mengambil multiple users berdasarkan ID dalam satu query
+	if err := u.db.WithContext(ctx).Where("id IN (?)", userIDs).Preload("Roles").Find(&modelUsers).Error; err != nil {
+		log.Errorf("[UserRepository-1] GetUsersByIDs: %v", err)
+		return nil, err
+	}
+
+	if len(modelUsers) == 0 {
+		// Jika tidak ada user ditemukan, kembalikan slice kosong tanpa error, atau error 404 jika memang tidak boleh kosong
+		// Untuk kasus bulk fetch, biasanya lebih baik mengembalikan slice kosong jika tidak ada yang ditemukan
+		return []entity.UserEntity{}, nil
+	}
+
+	respEntities := make([]entity.UserEntity, 0, len(modelUsers))
+	for _, userMdl := range modelUsers {
+		roleName := ""
+		roleId := 0
+		if len(userMdl.Roles) > 0 {
+			roleName = userMdl.Roles[0].Name
+			roleId = userMdl.Roles[0].ID
+		}
+		respEntities = append(respEntities, entity.UserEntity{
+			ID:         userMdl.ID,
+			Name:       userMdl.Name,
+			Email:      userMdl.Email,
+			Address:    userMdl.Address,
+			Photo:      userMdl.Photo,
+			Lat:        userMdl.Lat,
+			Lng:        userMdl.Lng,
+			Phone:      userMdl.Phone,
+			RoleID:     roleId,
+			RoleName:   roleName,
+			IsVerified: userMdl.IsVerified,
+		})
+	}
+	return respEntities, nil
 }
 
 // DeleteCustomer implements IUserRepository.
@@ -152,10 +196,10 @@ func (u *UserRepository) GetCustomerByID(ctx context.Context, customerID int) (*
 		return nil, err
 	}
 
-	roleId := 0
-
+	var roleMdl models.Role // Deklarasi roleMdl di sini
 	for _, role := range userMdl.Roles {
-		roleId = role.ID
+		roleMdl = role // Assign role pertama ke roleMdl
+		break         // Ambil hanya role pertama
 	}
 
 	return &entity.UserEntity{
@@ -167,7 +211,7 @@ func (u *UserRepository) GetCustomerByID(ctx context.Context, customerID int) (*
 		Lat:     userMdl.Lat,
 		Lng:     userMdl.Lng,
 		Phone:   userMdl.Phone,
-		RoleID:  roleId,
+		RoleID:  roleMdl.ID, // Gunakan ID dari roleMdl yang ditemukan
 	}, nil
 }
 

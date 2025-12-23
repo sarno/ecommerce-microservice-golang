@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"order-service/config"
 	"order-service/internal/adapter"
@@ -19,10 +20,87 @@ type IOrderHandler interface {
 	GetAllAdmin(c echo.Context) error
 	CreateOrder(c echo.Context) error
 	GetDetailCustomer(c echo.Context) error
+
+	GetAllCustomer(c echo.Context) error
 }
 
 type orderHandler struct {
 	orderService service.IOrderService
+}
+
+// GetAllCustomer implements [IOrderHandler].
+func (o *orderHandler) GetAllCustomer(c echo.Context) error {
+	var (
+		ctx         = c.Request().Context()
+		respOrders  = []response.OrderCustomerList{} // Ini akan diisi dengan data yang diformat
+		jwtUserData = entity.JwtUserData{}
+	)
+	
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[OrderHandler-1] GetAllCustomer: %s", "data token not found")
+		return c.JSON(http.StatusUnauthorized, response.ResponseError("data token not found"))
+	}
+
+	err := json.Unmarshal([]byte(user), &jwtUserData)
+	if err != nil {
+		log.Errorf("[OrderHandler-2] GetAllCustomer: %v", err)
+		return c.JSON(http.StatusBadRequest, response.ResponseError(err.Error()))
+	}
+
+	userID := jwtUserData.UserID
+
+	search := c.QueryParam("search")
+	var page int64 = 1
+	if pageStr := c.QueryParam("page"); pageStr != "" {
+		page, _ = conv.StringToInt64(pageStr)
+		if page <= 0 {
+			page = 1
+		}
+	}
+
+	var perPage int64 = 10
+	if perPageStr := c.QueryParam("perPage"); perPageStr != "" {
+		perPage, _ = conv.StringToInt64(perPageStr)
+		if perPage <= 0 {
+			perPage = 10
+		}
+	}
+
+	status := ""
+	if statusStr := c.QueryParam("status"); statusStr != "" {
+		status = statusStr
+	}
+
+	reqEntity := entity.QueryStringEntity{
+		Search:  search,
+		Status:  status,
+		Page:    page,
+		Limit:   perPage,
+		BuyerID: userID,
+	}
+
+	results, totalData, totalPage, err := o.orderService.GetAllCustomer(ctx, reqEntity, user)
+	if err != nil {
+		log.Errorf("[OrderHandler-3] GetAllCustomer: %v", err) // Mengubah log level error
+		if err.Error() == "404" {
+			return c.JSON(http.StatusNotFound, response.ResponseError("data not found"))
+		}
+		return c.JSON(http.StatusInternalServerError, response.ResponseError(err.Error()))
+	}
+
+	// Mempopulasi respOrders dari results
+	for _, result := range results {
+		respOrders = append(respOrders, response.OrderCustomerList{
+			ID:          result.ID,
+			OrderCode:   result.OrderCode,
+			OrderDateTime:   result.OrderDate,
+			Status:      result.Status,
+			TotalAmount: result.TotalAmount,
+		})
+	}
+
+	return c.JSON(http.StatusOK, response.ResponseSuccessWithPagination("success", respOrders, page, totalData, totalPage, perPage))
 }
 
 // GetDetailCustomer implements [IOrderHandler].
@@ -75,7 +153,6 @@ func (o *orderHandler) GetDetailCustomer(c echo.Context) error {
 		CustomerID:      order.BuyerId,
 	}
 
-
 	for _, item := range order.OrderItems {
 		respOrder.OrderDetail = append(respOrder.OrderDetail, response.OrderDetail{
 			ProductName:  item.ProductName,
@@ -85,7 +162,6 @@ func (o *orderHandler) GetDetailCustomer(c echo.Context) error {
 		})
 	}
 
-	
 	return c.JSON(http.StatusOK, response.ResponseSuccess("success", respOrder))
 }
 
@@ -210,6 +286,7 @@ func NewOrderHandler(orderService service.IOrderService, e *echo.Echo, cfg *conf
 	authGroup := e.Group("auth", mid.CheckToken())
 	authGroup.POST("/orders", ordHandler.CreateOrder, mid.DistanceCheck())
 	authGroup.GET("/orders/:orderID", ordHandler.GetDetailCustomer)
+	authGroup.GET("/orders", ordHandler.GetAllCustomer)
 
 	adminGroup := e.Group("/admin", mid.CheckToken())
 	adminGroup.GET("/orders", ordHandler.GetAllAdmin)

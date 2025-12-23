@@ -27,11 +27,66 @@ type IProductHandler interface {
 	GetAllHome(c echo.Context) error
 	GetAllShop(c echo.Context) error
 	GetDetailHome(c echo.Context) error
+	GetByIDs(c echo.Context) error
 }
 
 // struct
 type productHandler struct {
 	productService service.IProductService
+}
+
+func (p *productHandler) GetByIDs(c echo.Context) error {
+	var (
+		resp      = response.DefaultResponse{}
+		ctx       = c.Request().Context()
+		respLists = []response.ProductHomeListResponse{}
+	)
+
+	idsStr := c.QueryParam("ids")
+	if idsStr == "" {
+		log.Errorf("[ProductHandler-1] GetByIDs: missing 'ids' query parameter")
+		resp.Message = "missing 'ids' query parameter"
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+
+	idStrings := strings.Split(idsStr, ",")
+	productIDs := make([]int64, 0, len(idStrings))
+	for _, s := range idStrings {
+		id, err := conv.StringToInt64(s)
+		if err != nil {
+			log.Errorf("[ProductHandler-2] GetByIDs: invalid ID format '%s': %v", s, err)
+			resp.Message = "invalid ID format"
+			return c.JSON(http.StatusBadRequest, resp)
+		}
+		productIDs = append(productIDs, id)
+	}
+
+	results, err := p.productService.GetByIDs(ctx, productIDs)
+	if err != nil {
+		log.Errorf("[ProductHandler-3] GetByIDs: %v", err)
+		if err.Error() == "404" {
+			resp.Message = "No products found for the given IDs"
+			resp.Data = []response.ProductHomeListResponse{}
+			return c.JSON(http.StatusNotFound, resp)
+		}
+		resp.Message = "internal server error"
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+
+	for _, result := range results {
+		respLists = append(respLists, response.ProductHomeListResponse{
+			ID:           result.ID,
+			ProductName:  result.Name,
+			ProductImage: result.Image,
+			SalePrice:    int64(result.SalePrice),
+			RegulerPrice: int64(result.RegulerPrice),
+			CategoryName: result.CategoryName,
+		})
+	}
+
+	resp.Message = "success"
+	resp.Data = respLists
+	return c.JSON(http.StatusOK, resp)
 }
 
 // GetDetailHome implements [IProductHandler].
@@ -649,6 +704,7 @@ func NewProductHandler(e *echo.Echo, cfg *config.Config, productService service.
 	adminGroup := e.Group("/admin", mid.CheckToken())
 	adminGroup.GET("/products", productHandler.GetAllAdmin)
 	adminGroup.POST("/products", productHandler.CreateAdmin)
+	adminGroup.GET("/products/bulk", productHandler.GetByIDs)
 	adminGroup.GET("/products/:id", productHandler.GetByIDAdmin)
 	adminGroup.PUT("/products/:id", productHandler.EditAdmin)
 	adminGroup.DELETE("/products/:id", productHandler.DeleteAdmin)
@@ -656,6 +712,7 @@ func NewProductHandler(e *echo.Echo, cfg *config.Config, productService service.
 	homeProduct := e.Group("/products")
 	homeProduct.GET("/home", productHandler.GetAllHome)
 	homeProduct.GET("/shop", productHandler.GetAllShop)
+	homeProduct.GET("/home/bulk", productHandler.GetByIDs)
 	homeProduct.GET("/home/:id", productHandler.GetDetailHome)
 
 	return productHandler

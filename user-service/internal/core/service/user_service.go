@@ -33,6 +33,7 @@ type IUserService interface {
 	CreateCustomer(ctx context.Context, req entity.UserEntity) error
 	UpdateCustomer(ctx context.Context, req entity.UserEntity) error
 	DeleteCustomer(ctx context.Context, customerID int) error
+	GetUsersByIDs(ctx context.Context, userIDs []int) ([]entity.UserEntity, error)
 }
 
 type UserService struct {
@@ -43,6 +44,11 @@ type UserService struct {
 	redisClient *redis.Client
 }
 
+// GetUsersByIDs implements [IUserService].
+func (u *UserService) GetUsersByIDs(ctx context.Context, userIDs []int) ([]entity.UserEntity, error) {
+	return u.repo.GetUsersByIDs(ctx, userIDs)
+}
+
 // CreateCustomer implements IUserService.
 func (u *UserService) CreateCustomer(ctx context.Context, req entity.UserEntity) error {
 	userID, err := u.repo.CreateCustomer(ctx, req)
@@ -51,7 +57,7 @@ func (u *UserService) CreateCustomer(ctx context.Context, req entity.UserEntity)
 		return err
 	}
 
-	messageparam := fmt.Sprintf("You have been registered in Sayur Project. Please login with the email and password you provided.")
+	messageparam := "You have been registered in Sayur Project. Please login with the email and password you provided."
 	go message.PublishMessage(userID,
 		req.Email,
 		messageparam,
@@ -78,7 +84,7 @@ func (u *UserService) UpdateCustomer(ctx context.Context, req entity.UserEntity)
 	}
 
 	if req.Password != "" {
-		messageparam := fmt.Sprintf("Your account password has been updated. Please login using your new password.")
+		messageparam := "Your account password has been updated. Please login using your new password."
 		go message.PublishMessage(req.ID,
 			req.Email,
 			messageparam,

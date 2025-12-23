@@ -21,10 +21,10 @@ import (
 type IProductRepository interface {
 	GetAll(ctx context.Context, query entities.QueryStringProduct) ([]entities.ProductEntity, int64, int64, error)
 	GetByID(ctx context.Context, productID int64) (*entities.ProductEntity, error)
+	GetByIDs(ctx context.Context, productIDs []int64) ([]entities.ProductEntity, error)
 	Create(ctx context.Context, req entities.ProductEntity) (int64, error)
 	Update(ctx context.Context, req entities.ProductEntity) error
 	Delete(ctx context.Context, productID int64) error
-
 	SearchProducts(ctx context.Context, query entities.QueryStringProduct) ([]entities.ProductEntity, int64, int64, error)
 }
 
@@ -32,6 +32,45 @@ type IProductRepository interface {
 type productRepository struct {
 	db       *gorm.DB
 	esClient *elasticsearch.Client
+}
+
+func (p *productRepository) GetByIDs(ctx context.Context, productIDs []int64) ([]entities.ProductEntity, error) {
+	if len(productIDs) == 0 {
+		return []entities.ProductEntity{}, nil
+	}
+
+	modelProducts := []models.Product{}
+	if err := p.db.WithContext(ctx).Preload("Category").Where("id IN (?)", productIDs).Find(&modelProducts).Error; err != nil {
+		log.Errorf("[ProductRepository-1] GetByIDs: %v", err)
+		return nil, err
+	}
+
+	if len(modelProducts) == 0 {
+		return []entities.ProductEntity{}, nil
+	}
+
+	respProducts := []entities.ProductEntity{}
+	for _, val := range modelProducts {
+		respProducts = append(respProducts, entities.ProductEntity{
+			ID:           val.ID,
+			CategorySlug: val.CategorySlug,
+			ParentID:     val.ParentID,
+			Name:         val.Name,
+			Image:        val.Image,
+			Description:  val.Description,
+			RegulerPrice: val.RegulerPrice,
+			SalePrice:    val.SalePrice,
+			Unit:         val.Unit,
+			Weight:       val.Weight,
+			Stock:        val.Stock,
+			Variant:      val.Variant,
+			Status:       val.Status,
+			CategoryName: val.Category.Name,
+			CreatedAt:    val.CreatedAt,
+		})
+	}
+
+	return respProducts, nil
 }
 
 // SearchProducts implements [IProductRepository].

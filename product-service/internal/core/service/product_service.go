@@ -14,6 +14,8 @@ import (
 type IProductService interface {
 	GetAll(ctx context.Context, query entities.QueryStringProduct) ([]entities.ProductEntity, int64, int64, error)
 	GetByID(ctx context.Context, productID int64) (*entities.ProductEntity, error)
+	GetByIDs(ctx context.Context, productIDs []int64) ([]entities.ProductEntity, error)
+
 	Create(ctx context.Context, req entities.ProductEntity) error
 	Update(ctx context.Context, req entities.ProductEntity) error
 	Delete(ctx context.Context, productID int64) error
@@ -26,6 +28,11 @@ type productService struct {
 	repo              repository.IProductRepository
 	repoCat           repository.ICategoryRepository
 	publisherRabbitMQ message.IPublishRabbitMQ
+}
+
+// GetByIDs implements [IProductService].
+func (p *productService) GetByIDs(ctx context.Context, productIDs []int64) ([]entities.ProductEntity, error) {
+	return p.repo.GetByIDs(ctx, productIDs)
 }
 
 // SearchProducts implements [IProductService].

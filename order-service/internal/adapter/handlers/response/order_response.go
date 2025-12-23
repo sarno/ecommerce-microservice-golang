@@ -58,3 +58,17 @@ type OrderDetail struct {
 	ProductPrice int64  `json:"product_price"`
 	Quantity     int64  `json:"quantity"`
 }
+
+type OrderCustomerList struct {
+	ID            int64  `json:"id"`
+	OrderCode     string `json:"order_code"`
+	ProductImage  string `json:"product_image"`
+	ProductName   string `json:"product_name"`
+	Status        string `json:"status"`
+	PaymentMethod string `json:"payment_method"`
+	TotalAmount   int64  `json:"total_amount"`
+	Weight        int64  `json:"weight"`
+	Unit          string `json:"unit"`
+	Quantity      int64  `json:"quantity"`
+	OrderDateTime string `json:"order_datetime"`
+}
