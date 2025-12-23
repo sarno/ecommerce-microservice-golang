@@ -29,10 +29,18 @@ func RunServer() {
 		return
 	}
 
+	elasticInit, err := cfg.InitElasticsearch()
+	if err != nil {
+		log.Fatalf("[RunServer-2] %v", err)
+		return
+	}
+
 	publisher := message.NewPublisherRabbitMQ(cfg)
 	orderRepo := repository.NewOrderRepository(db.DB)
+	elasticRepo := repository.NewElasticRepository(elasticInit)
+
 	httpClient := httpclient.NewHttpClient(cfg)
-	orderService := service.NewOrderService(orderRepo, cfg, httpClient, publisher)
+	orderService := service.NewOrderService(orderRepo, cfg, httpClient, publisher, elasticRepo)
 
 	e := echo.New()
 	e.Use(middleware.CORS())

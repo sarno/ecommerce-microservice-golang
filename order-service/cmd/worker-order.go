@@ -8,7 +8,7 @@ import (
 )
 
 var workerCmd = &cobra.Command{
-	Use:   "worker-order",
+	Use:   "worker:order",
 	Short: "Menjalankan worker untuk consume RabbitMQ dan index ke Elasticsearch",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Worker untuk Order Indexing sedang berjalan...")

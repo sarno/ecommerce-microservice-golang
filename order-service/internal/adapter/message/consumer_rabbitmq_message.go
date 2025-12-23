@@ -106,3 +106,4 @@ func StartOrderConsumer() {
 	log.Infof("[StartOrderConsumer-10] Waiting for messages. To exit press CTRL+C")
 	<-forever
 }
+

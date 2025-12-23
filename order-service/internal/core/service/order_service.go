@@ -28,6 +28,7 @@ type orderService struct {
 	cfg               *config.Config
 	httpClient        httpclient.IHttpClient
 	publisherRabbitMQ message.IPublisherRabbitMQ
+	elasticRepo       repository.IElasticRepository
 }
 
 // GetDetailCustomer implements [IOrderService].
@@ -111,7 +112,14 @@ func (o *orderService) CreateOrder(ctx context.Context, req entity.OrderEntity, 
 
 // GetAll implements [IOrderService].
 func (o *orderService) GetAll(ctx context.Context, queryString entity.QueryStringEntity, accessToken string) ([]entity.OrderEntity, int64, int64, error) {
-	results, count, total, err := o.repo.GetAll(ctx, queryString)
+	results, count, total, err := o.elasticRepo.SearchOrderElastic(ctx, queryString)
+	if err == nil {
+		return results, count, total, nil
+	} else {
+		log.Errorf("[OrderService-1] GetAll: %v", err)
+	}
+
+	results, count, total, err = o.repo.GetAll(ctx, queryString)
 	if err != nil {
 		log.Errorf("[OrderService-2] GetAll: %v", err)
 		return nil, 0, 0, err
@@ -196,12 +204,13 @@ func (o *orderService) GetByID(ctx context.Context, orderID int64, accessToken s
 	return result, nil
 }
 
-func NewOrderService(orderRepo repository.IOrderRepository, cfg *config.Config, httpClient httpclient.IHttpClient, publisher message.IPublisherRabbitMQ) IOrderService {
+func NewOrderService(orderRepo repository.IOrderRepository, cfg *config.Config, httpClient httpclient.IHttpClient, publisher message.IPublisherRabbitMQ, elasticRepo repository.IElasticRepository) IOrderService {
 	return &orderService{
 		repo:              orderRepo,
 		cfg:               cfg,
 		httpClient:        httpClient,
 		publisherRabbitMQ: publisher,
+		elasticRepo:       elasticRepo,
 	}
 }
 
