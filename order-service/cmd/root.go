@@ -26,6 +26,7 @@ func init() {
 	rootCmd.AddCommand(startCmd)
 	rootCmd.AddCommand(workerCmd)
 	rootCmd.AddCommand(workerUpdateStatusCmd)
+	rootCmd.AddCommand(workerDeleteOrderCmd)
 }
 
 func initConfig() {

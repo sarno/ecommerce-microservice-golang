@@ -209,3 +209,74 @@ func ConsumeUpdateStatus() {
 	<-forever
 }
 
+func ConsumeDeleteOrder() {
+	conn, err := config.NewConfig().NewRabbitMQ()
+	if err != nil {
+		log.Errorf("[ConsumeDeleteOrder-1] Failed to connect to RabbitMQ: %v", err)
+	}
+
+	defer conn.Close()
+
+	ch, err := conn.Channel()
+	if err != nil {
+		log.Errorf("[ConsumeDeleteOrder-2] Failed to open a channel: %v", err)
+	}
+
+	defer ch.Close()
+
+	q, err := ch.QueueDeclare(
+		config.NewConfig().PublisherName.PublisherDeleteOrder,
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		log.Fatalf("[ConsumeDeleteOrder-3] Failed to declare queue: %v", err)
+	}
+
+
+	msgs, err := ch.Consume(
+		q.Name,
+		"",
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		log.Fatalf("[ConsumeDeleteOrder-4] Failed to register consumer: %v", err)
+	}
+
+	log.Info("RabbitMQ Consumer order started...")
+	esClient, err := config.NewConfig().InitElasticsearch()
+
+	if err != nil {
+		log.Errorf("[ConsumeDeleteOrder-5] Failed initialize Elasticsearch client: %v", err)
+	}
+
+	forever := make(chan bool)
+	go func() {
+		for msqg := range msgs {
+			var order map[string]string
+			err := json.Unmarshal(msqg.Body, &order)
+			if err != nil {
+				log.Errorf("[ConsumeDeleteOrder-5] Error decoding message: %v", err)
+				continue
+			}
+			orderID := order["orderID"]
+			res, err := esClient.Delete("orders", orderID)
+			if err != nil {
+				log.Errorf("[ConsumeDeleteOrder-7] Failed to update payment method in Elasticsearch: %v", err)
+			}
+
+			defer res.Body.Close()
+		}
+	}()
+
+	log.Infof("[ConsumeDeleteOrder-8] Waiting for messages. To exit press CTRL+C")
+	<-forever
+}
+

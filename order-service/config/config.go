@@ -54,12 +54,13 @@ type ElasticSearch struct {
 
 type PublisherName struct {
 	ProductUpdateStock string `json:"product_update_stock"`
-	ProductPublish     string `json:"product_publish"`
-	ProductDelete      string `json:"product_delete"`
-	ProductToOrder     string `json:"product_to_order"`
+	// ProductPublish     string `json:"product_publish"`
+	// ProductDelete      string `json:"product_delete"`
+	// ProductToOrder     string `json:"product_to_order"`
 	OrderPublish            string `json:"order_publish"`
 	EmailUpdateStatus       string `json:"email_update_status"`
 	PublisherUpdateStatus   string `json:"publisher_update_status"`
+	PublisherDeleteOrder    string `json:"publisher_delete_order"`
 }
 
 type Config struct {
@@ -120,9 +121,9 @@ func NewConfig() *Config {
 		},
 		PublisherName: PublisherName{
 			ProductUpdateStock: viper.GetString("PRODUCT_UPDATE_STOCK_NAME"),
-			ProductPublish:     viper.GetString("PRODUCT_PUBLISH_NAME"),
-			ProductDelete:      viper.GetString("PRODUCT_DELETE"),
-			ProductToOrder:     viper.GetString("PRODUCT_TO_ORDER"),
+			// ProductPublish:     viper.GetString("PRODUCT_PUBLISH_NAME"),
+			// ProductDelete:      viper.GetString("PRODUCT_DELETE"),
+			// ProductToOrder:     viper.GetString("PRODUCT_TO_ORDER"),
 			OrderPublish:       viper.GetString("ORDER_PUBLISH_NAME"),
 			EmailUpdateStatus:       viper.GetString("EMAIL_UPDATE_STATUS_NAME"),
 			PublisherUpdateStatus:   viper.GetString("PUBLISHER_UPDATE_STATUS"),

@@ -25,10 +25,47 @@ type IOrderHandler interface {
 	GetAllCustomer(c echo.Context) error
 	GetOrderByOrderCode(c echo.Context) error
 	UpdateStatus(c echo.Context) error
+	DeleteByID(c echo.Context) error
 }
 
 type orderHandler struct {
 	orderService service.IOrderService
+}
+
+// DeleteByID implements [IOrderHandler].
+func (o *orderHandler) DeleteByID(c echo.Context) error {
+	var (
+		ctx = c.Request().Context()
+	)
+
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[OrderHandler-1] DeleteByID: %s", "data token not found")
+		return c.JSON(http.StatusUnauthorized, response.ResponseError("data token not found"))
+	}
+
+	idParams := c.Param("orderID")
+	if idParams == "" {
+		log.Errorf("[OrderHandler-2] DeleteByID: %s", "orderID not found")
+		return c.JSON(http.StatusNotFound, response.ResponseError("orderID not found"))
+	}
+
+	orderID, err := conv.StringToInt64(idParams)
+	if err != nil {
+		log.Errorf("[OrderHandler-3] DeleteByID: %v", err)
+		return c.JSON(http.StatusInternalServerError, response.ResponseError(err.Error()))
+	}
+
+	err = o.orderService.DeleteByID(ctx, orderID)
+	if err != nil {
+		log.Errorf("[OrderHandler-4] DeleteByID: %v", err)
+		if err.Error() == "404" {
+			return c.JSON(http.StatusNotFound, response.ResponseError("data not found"))
+		}
+		return c.JSON(http.StatusInternalServerError, response.ResponseError(err.Error()))
+	}
+
+	return c.JSON(http.StatusOK, response.ResponseSuccess("success", nil))
 }
 
 // UpdateStatus implements [IOrderHandler].
@@ -37,7 +74,7 @@ func (o *orderHandler) UpdateStatus(c echo.Context) error {
 		ctx = c.Request().Context()
 		req = request.OrderUpdateStatusRequest{}
 	)
-	
+
 	user := c.Get("user").(string)
 	if user == "" {
 		log.Errorf("[OrderHandler-1] UpdateStatus: %s", "data token not found")
@@ -83,7 +120,7 @@ func (o *orderHandler) UpdateStatus(c echo.Context) error {
 			return c.JSON(http.StatusBadRequest, response.ResponseError("Invalid status transition"))
 		}
 		return c.JSON(http.StatusInternalServerError, response.ResponseError(err.Error()))
-	
+
 	}
 
 	return c.JSON(http.StatusOK, response.ResponseSuccess("success", nil))
@@ -472,6 +509,7 @@ func NewOrderHandler(orderService service.IOrderService, e *echo.Echo, cfg *conf
 	adminGroup.GET("/orders", ordHandler.GetAllAdmin)
 	adminGroup.GET("/orders/:orderID", ordHandler.GetByIDAdmin)
 	adminGroup.PUT("/orders/:orderID/status", ordHandler.UpdateStatus)
+	adminGroup.DELETE("/orders/:orderID", ordHandler.DeleteByID)
 
 	return ordHandler
 }

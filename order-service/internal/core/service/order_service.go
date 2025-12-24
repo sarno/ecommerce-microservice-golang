@@ -25,6 +25,7 @@ type IOrderService interface {
 
 	GetOrderByOrderCode(ctx context.Context, orderCode, accessToken string) (*entity.OrderEntity, error)
 	UpdateStatus(ctx context.Context, req entity.OrderEntity, accessToken string) error
+	DeleteByID(ctx context.Context, orderID int64) error
 }
 
 type orderService struct {
@@ -34,6 +35,23 @@ type orderService struct {
 	elasticRepo       repository.IElasticRepository
 	userClient        client.IUserClient
 	productClient     client.IProductClient
+}
+
+// DeleteByID implements [IOrderService].
+func (o *orderService) DeleteByID(ctx context.Context, orderID int64) error {
+	err := o.repo.DeleteOrder(ctx, orderID)
+	if err != nil {
+		log.Errorf("[OrderService-1] DeleteByID: %v", err)
+		return err
+	}
+
+	err = o.publisherRabbitMQ.PublishDeleteOrderFromQueue(orderID)
+	if err != nil {
+		log.Errorf("[OrderService-2] DeleteByID: %v", err)
+		return err
+	}
+
+	return nil
 }
 
 // UpdateStatus implements [IOrderService].

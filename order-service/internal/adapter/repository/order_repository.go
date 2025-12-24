@@ -17,12 +17,36 @@ type IOrderRepository interface {
 	GetByID(ctx context.Context, orderID int64) (*entity.OrderEntity, error)
 	CreateOrder(ctx context.Context, req entity.OrderEntity) (int64, error)
 	UpdateStatus(ctx context.Context, req entity.OrderEntity) (int64, string, string, error)
+	DeleteOrder(ctx context.Context, orderID int64) error
 
 	GetOrderByOrderCode(ctx context.Context, orderCode string) (*entity.OrderEntity, error)
 }
 
 type OrderRepository struct {
 	db *gorm.DB
+}
+
+// DeleteOrder implements [IOrderRepository].
+func (o *OrderRepository) DeleteOrder(ctx context.Context, orderID int64) error {
+	modelOrder := model.Order{}
+	if err := o.db.Preload("OrderItems").Where("id = ?", orderID).First(&modelOrder).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = errors.New("404")
+			log.Infof("[OrderRepository-1] DeleteOrder: Order not found")
+			return err
+		}
+
+		log.Errorf("[OrderRepository-2] DeleteOrder: %v", err)
+		return err
+	}
+
+	if err := o.db.Select("OrderItems").Delete(&modelOrder).Error; err != nil {
+		log.Errorf("[OrderRepository-3] DeleteOrder: %v", err)
+		return err
+	}
+
+	return nil
+	
 }
 
 // UpdateStatus implements [IOrderRepository].
@@ -67,7 +91,7 @@ func (o *OrderRepository) UpdateStatus(ctx context.Context, req entity.OrderEnti
 	}
 
 	return modelOrder.BuyerId, modelOrder.Status, modelOrder.OrderCode, nil
-	
+
 }
 
 // GetOrderByOrderCode implements [IOrderRepository].
