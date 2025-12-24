@@ -26,6 +26,7 @@ type IOrderService interface {
 	GetOrderByOrderCode(ctx context.Context, orderCode, accessToken string) (*entity.OrderEntity, error)
 	UpdateStatus(ctx context.Context, req entity.OrderEntity, accessToken string) error
 	DeleteByID(ctx context.Context, orderID int64) error
+	GetPublicOrderIDByOrderCode(ctx context.Context, orderCode string) (int64, error)
 }
 
 type orderService struct {
@@ -35,6 +36,17 @@ type orderService struct {
 	elasticRepo       repository.IElasticRepository
 	userClient        client.IUserClient
 	productClient     client.IProductClient
+}
+
+// GetPublicOrderIDByOrderCode implements [IOrderService].
+func (o *orderService) GetPublicOrderIDByOrderCode(ctx context.Context, orderCode string) (int64, error) {
+	result, err := o.repo.GetOrderByOrderCode(ctx, orderCode)
+	if err != nil {
+		log.Errorf("[OrderService-1] GetPublicOrderIDByOrderCode: %v", err)
+		return 0, err
+	}
+
+	return result.ID, nil
 }
 
 // DeleteByID implements [IOrderService].

@@ -26,10 +26,38 @@ type IOrderHandler interface {
 	GetOrderByOrderCode(c echo.Context) error
 	UpdateStatus(c echo.Context) error
 	DeleteByID(c echo.Context) error
+
+	GetPublicOrderByOrderCode(c echo.Context) error
 }
 
 type orderHandler struct {
 	orderService service.IOrderService
+}
+
+// GetPublicOrderByOrderCode implements [IOrderHandler].
+func (o *orderHandler) GetPublicOrderByOrderCode(c echo.Context) error {
+	var (
+		ctx = c.Request().Context()
+	)
+
+	orderCode := c.Param("orderCode")
+	if orderCode == "" {
+		log.Errorf("[OrderHandler-1] GetOrderByOrderCode: %s", "orderCode not found")
+		return c.JSON(http.StatusNotFound, response.ResponseError("orderCode not found"))
+	}
+	order, err := o.orderService.GetPublicOrderIDByOrderCode(ctx, orderCode)
+
+	if err != nil {
+		log.Errorf("[OrderHandler-2] GetOrderByOrderCode: %v", err)
+		if err.Error() == "404" {
+			return c.JSON(http.StatusNotFound, response.ResponseError("data not found"))
+		}
+		return c.JSON(http.StatusInternalServerError, response.ResponseError(err.Error()))
+	}
+
+	return c.JSON(http.StatusOK, response.ResponseSuccess("success", map[string]int64{
+		"orderID": order,
+	}))
 }
 
 // DeleteByID implements [IOrderHandler].
@@ -499,6 +527,8 @@ func NewOrderHandler(orderService service.IOrderService, e *echo.Echo, cfg *conf
 
 	e.Use(middleware.Recover())
 	mid := adapter.NewMiddlewareAdapter(cfg)
+	e.GET("public/orders/:orderCode/code", ordHandler.GetPublicOrderByOrderCode)
+	
 	authGroup := e.Group("auth", mid.CheckToken())
 	authGroup.POST("/orders", ordHandler.CreateOrder, mid.DistanceCheck())
 	authGroup.GET("/orders/:orderID", ordHandler.GetDetailCustomer)
