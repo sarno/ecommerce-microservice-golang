@@ -127,6 +127,7 @@ func NewConfig() *Config {
 			OrderPublish:       viper.GetString("ORDER_PUBLISH_NAME"),
 			EmailUpdateStatus:       viper.GetString("EMAIL_UPDATE_STATUS_NAME"),
 			PublisherUpdateStatus:   viper.GetString("PUBLISHER_UPDATE_STATUS"),
+			PublisherDeleteOrder:    viper.GetString("PUBLISHER_DELETE_ORDER"),
 		},
 	}
 }
