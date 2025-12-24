@@ -18,14 +18,193 @@ import (
 
 type IOrderHandler interface {
 	GetAllAdmin(c echo.Context) error
+	GetByIDAdmin(c echo.Context) error
 	CreateOrder(c echo.Context) error
 	GetDetailCustomer(c echo.Context) error
 
 	GetAllCustomer(c echo.Context) error
+	GetOrderByOrderCode(c echo.Context) error
+	UpdateStatus(c echo.Context) error
 }
 
 type orderHandler struct {
 	orderService service.IOrderService
+}
+
+// UpdateStatus implements [IOrderHandler].
+func (o *orderHandler) UpdateStatus(c echo.Context) error {
+	var (
+		ctx = c.Request().Context()
+		req = request.OrderUpdateStatusRequest{}
+	)
+	
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[OrderHandler-1] UpdateStatus: %s", "data token not found")
+		return c.JSON(http.StatusUnauthorized, response.ResponseError("data token not found"))
+	}
+
+	if err := c.Bind(&req); err != nil {
+		log.Errorf("[OrderHandler-2] UpdateStatus: %v", err)
+		return c.JSON(http.StatusBadRequest, response.ResponseError(err.Error()))
+	}
+
+	if err := c.Validate(&req); err != nil {
+		log.Errorf("[OrderHandler-3] UpdateStatus: %v", err)
+		return c.JSON(http.StatusUnprocessableEntity, response.ResponseError(err.Error()))
+	}
+
+	idParams := c.Param("orderID")
+	if idParams == "" {
+		log.Errorf("[OrderHandler-4] UpdateStatus: %s", "orderID not found")
+		return c.JSON(http.StatusNotFound, response.ResponseError("orderID not found"))
+	}
+
+	orderID, err := conv.StringToInt64(idParams)
+	if err != nil {
+		log.Errorf("[OrderHandler-5] UpdateStatus: %v", err)
+		return c.JSON(http.StatusInternalServerError, response.ResponseError(err.Error()))
+	}
+
+	reqEntity := entity.OrderEntity{
+		Remarks: req.Remarks,
+		Status:  req.Status,
+		ID:      orderID,
+	}
+
+	err = o.orderService.UpdateStatus(ctx, reqEntity, user)
+	if err != nil {
+		log.Errorf("[OrderHandler-6] UpdateStatus: %v", err)
+		if err.Error() == "404" {
+			return c.JSON(http.StatusNotFound, response.ResponseError("data not found"))
+		}
+
+		if err.Error() == "400" {
+			return c.JSON(http.StatusBadRequest, response.ResponseError("Invalid status transition"))
+		}
+		return c.JSON(http.StatusInternalServerError, response.ResponseError(err.Error()))
+	
+	}
+
+	return c.JSON(http.StatusOK, response.ResponseSuccess("success", nil))
+
+}
+
+// GetOrderByOrderCode implements [IOrderHandler].
+func (o *orderHandler) GetOrderByOrderCode(c echo.Context) error {
+	var (
+		ctx       = c.Request().Context()
+		respOrder = response.OrderAdminDetail{}
+	)
+
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[OrderHandler-1] GetOrderByOrderCode: %s", "data token not found")
+		return c.JSON(http.StatusNotFound, response.ResponseError("data token not found"))
+	}
+
+	orderCode := c.Param("orderCode")
+	if orderCode == "" {
+		log.Errorf("[OrderHandler-2] GetOrderByOrderCode: %s", "orderCode not found")
+		return c.JSON(http.StatusNotFound, response.ResponseError("orderCode not found"))
+	}
+	order, err := o.orderService.GetOrderByOrderCode(ctx, orderCode, user)
+
+	if err != nil {
+		log.Errorf("[OrderHandler-3] GetOrderByOrderCode: %v", err)
+		if err.Error() == "404" {
+			return c.JSON(http.StatusNotFound, response.ResponseError("data not found"))
+		}
+		return c.JSON(http.StatusInternalServerError, response.ResponseError(err.Error()))
+	}
+
+	respOrder.ID = order.ID
+	respOrder.OrderCode = order.OrderCode
+	respOrder.Status = order.Status
+	respOrder.TotalAmount = order.TotalAmount
+	respOrder.OrderDatetime = order.OrderDate
+	respOrder.ShippingFee = order.ShippingFee
+	respOrder.Remarks = order.Remarks
+	respOrder.PaymentMethod = order.PaymentMethod
+	respOrder.Customer = response.CustomerOrder{
+		CustomerName:    order.BuyerName,
+		CustomerPhone:   order.BuyerPhone,
+		CustomerAddress: order.BuyerAddress,
+		CustomerEmail:   order.BuyerEmail,
+		CustomerID:      order.BuyerId,
+	}
+
+	for _, item := range order.OrderItems {
+		respOrder.OrderDetail = append(respOrder.OrderDetail, response.OrderDetail{
+			ProductName:  item.ProductName,
+			ProductImage: item.ProductImage,
+			ProductPrice: item.Price,
+			Quantity:     item.Quantity,
+		})
+	}
+
+	return c.JSON(http.StatusOK, response.ResponseSuccess("success", respOrder))
+}
+
+// GetByIDAdmin implements [IOrderHandler].
+func (o *orderHandler) GetByIDAdmin(c echo.Context) error {
+	var (
+		ctx       = c.Request().Context()
+		respOrder = response.OrderAdminDetail{}
+	)
+
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[OrderHandler-1] GetByIDAdmin: %s", "data token not found")
+		return c.JSON(http.StatusNotFound, response.ResponseError("data token not found"))
+	}
+
+	orderIDStr := c.Param("orderID")
+	if orderIDStr == "" {
+		log.Errorf("[OrderHandler-2] GetByIDAdmin: %s", "orderID not found")
+		return c.JSON(http.StatusNotFound, response.ResponseError("orderID not found"))
+	}
+
+	orderID, err := conv.StringToInt64(orderIDStr)
+	if err != nil {
+		log.Errorf("[OrderHandler-3] GetByIDAdmin: %v", err)
+		return c.JSON(http.StatusInternalServerError, response.ResponseError(err.Error()))
+	}
+
+	order, err := o.orderService.GetByID(ctx, orderID, user)
+	if err != nil {
+		log.Errorf("[OrderHandler-4] GetByIDAdmin: %v", err)
+		if err.Error() == "404" {
+			return c.JSON(http.StatusNotFound, response.ResponseError("data not found"))
+		}
+		return c.JSON(http.StatusInternalServerError, response.ResponseError(err.Error()))
+	}
+
+	respOrder.ID = order.ID
+	respOrder.OrderCode = order.OrderCode
+	respOrder.Status = order.Status
+	respOrder.TotalAmount = order.TotalAmount
+	respOrder.OrderDatetime = order.OrderDate
+	respOrder.ShippingFee = order.ShippingFee
+	respOrder.Remarks = order.Remarks
+	respOrder.Customer = response.CustomerOrder{
+		CustomerName:    order.BuyerName,
+		CustomerPhone:   order.BuyerPhone,
+		CustomerAddress: order.BuyerAddress,
+		CustomerEmail:   order.BuyerEmail,
+		CustomerID:      order.BuyerId,
+	}
+
+	for _, item := range order.OrderItems {
+		respOrder.OrderDetail = append(respOrder.OrderDetail, response.OrderDetail{
+			ProductName:  item.ProductName,
+			ProductImage: item.ProductImage,
+			ProductPrice: item.Price,
+			Quantity:     item.Quantity,
+		})
+	}
+
+	return c.JSON(http.StatusOK, response.ResponseSuccess("success", respOrder))
 }
 
 // GetAllCustomer implements [IOrderHandler].
@@ -35,7 +214,7 @@ func (o *orderHandler) GetAllCustomer(c echo.Context) error {
 		respOrders  = []response.OrderCustomerList{} // Ini akan diisi dengan data yang diformat
 		jwtUserData = entity.JwtUserData{}
 	)
-	
+
 	user := c.Get("user").(string)
 	if user == "" {
 		log.Errorf("[OrderHandler-1] GetAllCustomer: %s", "data token not found")
@@ -92,11 +271,11 @@ func (o *orderHandler) GetAllCustomer(c echo.Context) error {
 	// Mempopulasi respOrders dari results
 	for _, result := range results {
 		respOrders = append(respOrders, response.OrderCustomerList{
-			ID:          result.ID,
-			OrderCode:   result.OrderCode,
-			OrderDateTime:   result.OrderDate,
-			Status:      result.Status,
-			TotalAmount: result.TotalAmount,
+			ID:            result.ID,
+			OrderCode:     result.OrderCode,
+			OrderDateTime: result.OrderDate,
+			Status:        result.Status,
+			TotalAmount:   result.TotalAmount,
 		})
 	}
 
@@ -287,9 +466,12 @@ func NewOrderHandler(orderService service.IOrderService, e *echo.Echo, cfg *conf
 	authGroup.POST("/orders", ordHandler.CreateOrder, mid.DistanceCheck())
 	authGroup.GET("/orders/:orderID", ordHandler.GetDetailCustomer)
 	authGroup.GET("/orders", ordHandler.GetAllCustomer)
+	authGroup.GET("/orders/:orderCode/code", ordHandler.GetOrderByOrderCode)
 
 	adminGroup := e.Group("/admin", mid.CheckToken())
 	adminGroup.GET("/orders", ordHandler.GetAllAdmin)
+	adminGroup.GET("/orders/:orderID", ordHandler.GetByIDAdmin)
+	adminGroup.PUT("/orders/:orderID/status", ordHandler.UpdateStatus)
 
 	return ordHandler
 }

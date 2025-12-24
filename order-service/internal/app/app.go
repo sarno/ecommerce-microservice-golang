@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"order-service/config"
+	"order-service/internal/adapter/client"
 	"order-service/internal/adapter/handlers"
 	httpclient "order-service/internal/adapter/http_client"
 	"order-service/internal/adapter/message"
@@ -38,9 +39,12 @@ func RunServer() {
 	publisher := message.NewPublisherRabbitMQ(cfg)
 	orderRepo := repository.NewOrderRepository(db.DB)
 	elasticRepo := repository.NewElasticRepository(elasticInit)
-
 	httpClient := httpclient.NewHttpClient(cfg)
-	orderService := service.NewOrderService(orderRepo, cfg, httpClient, publisher, elasticRepo)
+
+	userClient := client.NewUserClient(cfg, httpClient)
+	productClient := client.NewProductClient(cfg, httpClient)
+	
+	orderService := service.NewOrderService(orderRepo, cfg, publisher, elasticRepo, userClient, productClient)
 
 	e := echo.New()
 	e.Use(middleware.CORS())

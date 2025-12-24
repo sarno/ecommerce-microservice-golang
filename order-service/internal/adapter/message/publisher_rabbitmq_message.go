@@ -2,8 +2,10 @@ package message
 
 import (
 	"encoding/json"
+	"fmt"
 	"order-service/config"
 	"order-service/internal/core/domain/entity"
+	"order-service/utils"
 
 	"github.com/labstack/gommon/log"
 	"github.com/streadway/amqp"
@@ -12,10 +14,195 @@ import (
 type IPublisherRabbitMQ interface {
 	PublishOrderToQueue(order entity.OrderEntity) error
 	PublishUpdateStock(productID int64, quantity int64)
+	PublishSendEmailUpdateStatus(email, message, queuename string, userID int64) error
+	PublishSendPushNotifUpdateStatus(message, queuename string, userID int64) error
+	PublishUpdateStatus(queuename string, orderID int64, status string) error
 }
 
 type PublisherRabbitMQ struct {
 	cfg *config.Config
+}
+
+// PublishUpdateStatus implements [IPublisherRabbitMQ].
+func (p *PublisherRabbitMQ) PublishUpdateStatus(queuename string, orderID int64, status string) error {
+	conn, err := p.cfg.NewRabbitMQ()
+	if err != nil {
+		log.Errorf("[PublishUpdateStatus-1] Failed to connect to RabbitMQ: %v", err)
+		return err
+	}
+
+	defer conn.Close()
+
+	ch, err := conn.Channel()
+	if err != nil {
+		log.Errorf("[PublishUpdateStatus-2] Failed to open a channel: %v", err)
+		return err
+	}
+
+	defer ch.Close()
+
+	queue, err := ch.QueueDeclare(
+		queuename,
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+
+	if err != nil {
+		log.Errorf("[PublishUpdateStatus-3] Failed to declare a queue: %v", err)
+		return err
+	}
+
+	orderStatus := map[string]string{
+		"orderID": fmt.Sprintf("%d", orderID),
+		"status":  status,
+	}
+
+	body, err := json.Marshal(orderStatus)
+	if err != nil {
+		log.Errorf("[PublishUpdateStatus-4] Failed to marshal JSON: %v", err)
+		return err
+	}
+
+	return ch.Publish(
+		"",
+		queue.Name,
+		false,
+		false,
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        body,
+		},
+	)
+}
+
+// PublishSendPushNotifUpdateStatus implements [IPublisherRabbitMQ].
+func (p *PublisherRabbitMQ) PublishSendPushNotifUpdateStatus(message string, queuename string, userID int64) error {
+	conn, err := p.cfg.NewRabbitMQ()
+	if err != nil {
+		log.Errorf("[PublishSendEmailUpdateStatus-1] Failed to connect to RabbitMQ: %v", err)
+		return err
+	}
+
+	defer conn.Close()
+
+	ch, err := conn.Channel()
+	if err != nil {
+		log.Errorf("[PublishSendEmailUpdateStatus-2] Failed to open a channel: %v", err)
+		return err
+	}
+
+	defer ch.Close()
+
+	queue, err := ch.QueueDeclare(
+		queuename,
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+
+	if err != nil {
+		log.Errorf("[PublishSendEmailUpdateStatus-3] Failed to declare a queue: %v", err)
+		return err
+	}
+
+	notifType := "EMAIL"
+	if queuename == utils.PUSH_NOTIF {
+		notifType = "PUSH"
+	}
+
+	notification := map[string]interface{}{
+		"receiver_email":    "",
+		"message":           message,
+		"subject":           "Update Status Order",
+		"type":              "UPDATE_STATUS",
+		"receiver_id":       userID,
+		"notification_type": notifType,
+	}
+
+	body, err := json.Marshal(notification)
+	if err != nil {
+		log.Errorf("[PublishSendEmailUpdateStatus-4] Failed to marshal JSON: %v", err)
+		return err
+	}
+
+	return ch.Publish(
+		"",
+		queue.Name,
+		false,
+		false,
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        body,
+		},
+	)
+}
+
+// PublishSendEmailUpdateStatus implements [IPublisherRabbitMQ].
+func (p *PublisherRabbitMQ) PublishSendEmailUpdateStatus(email string, message string, queuename string, userID int64) error {
+	conn, err := p.cfg.NewRabbitMQ()
+	if err != nil {
+		log.Errorf("[PublishSendEmailUpdateStatus-1] Failed to connect to RabbitMQ: %v", err)
+		return err
+	}
+
+	defer conn.Close()
+	ch, err := conn.Channel()
+	if err != nil {
+		log.Errorf("[PublishSendEmailUpdateStatus-2] Failed to open a channel: %v", err)
+		return err
+	}
+
+	defer ch.Close()
+	queue, err := ch.QueueDeclare(
+		queuename,
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+
+	if err != nil {
+		log.Errorf("[PublishSendEmailUpdateStatus-3] Failed to declare a queue: %v", err)
+		return err
+	}
+
+	notifType := "EMAIL"
+	if queuename == utils.PUSH_NOTIF {
+		notifType = "PUSH"
+	}
+
+	notification := map[string]interface{}{
+		"receiver_email":    email,
+		"message":           message,
+		"subject":           "Update Status Order",
+		"type":              "UPDATE_STATUS",
+		"receiver_id":       userID,
+		"notification_type": notifType,
+	}
+
+	body, err := json.Marshal(notification)
+	if err != nil {
+		log.Errorf("[PublishSendEmailUpdateStatus-4] Failed to marshal JSON: %v", err)
+		return err
+	}
+
+	return ch.Publish(
+		"",
+		queue.Name,
+		false,
+		false,
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        body,
+		},
+	)
+
 }
 
 // PublishUpdateStock implements [IPublisherRabbitMQ].

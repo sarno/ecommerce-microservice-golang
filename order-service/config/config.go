@@ -58,6 +58,8 @@ type PublisherName struct {
 	ProductDelete      string `json:"product_delete"`
 	ProductToOrder     string `json:"product_to_order"`
 	OrderPublish            string `json:"order_publish"`
+	EmailUpdateStatus       string `json:"email_update_status"`
+	PublisherUpdateStatus   string `json:"publisher_update_status"`
 }
 
 type Config struct {
@@ -122,6 +124,8 @@ func NewConfig() *Config {
 			ProductDelete:      viper.GetString("PRODUCT_DELETE"),
 			ProductToOrder:     viper.GetString("PRODUCT_TO_ORDER"),
 			OrderPublish:       viper.GetString("ORDER_PUBLISH_NAME"),
+			EmailUpdateStatus:       viper.GetString("EMAIL_UPDATE_STATUS_NAME"),
+			PublisherUpdateStatus:   viper.GetString("PUBLISHER_UPDATE_STATUS"),
 		},
 	}
 }
