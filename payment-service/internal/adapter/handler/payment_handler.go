@@ -249,6 +249,9 @@ func (p *paymentHandler) GetAllCustomer(c echo.Context) error {
 
 	results, count, total, err := p.PaymentService.GetAll(ctx, reqEntity, user)
 	if err != nil {
+		if err.Error() == "404" {
+			return c.JSON(http.StatusNotFound, response.ResponseDefault("Data not found", nil))
+		}
 		log.Errorf("[PaymentHandler-3] GetAll: %v", err)
 		return c.JSON(http.StatusInternalServerError, response.ResponseDefault(err.Error(), nil))
 	}
