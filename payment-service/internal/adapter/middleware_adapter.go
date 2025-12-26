@@ -71,3 +71,10 @@ func (m *middlewareAdapter) CheckToken() echo.MiddlewareFunc {
 		}
 	}
 }
+
+func NewMiddlewareAdapter(cfg *config.Config) IMiddlewareAdapter {
+	return &middlewareAdapter{
+		cfg: cfg,
+	}
+}
+
