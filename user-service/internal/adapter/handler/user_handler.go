@@ -184,8 +184,8 @@ func (u *userHandler) SignIn(c echo.Context) error {
 
 	if err != nil {
 		if err.Error() == "404" {
-			log.Errorf("[UserHandler-1] SignIn : %v", "User not found")
-			resp.Message = "User not found"
+			log.Errorf("[UserHandler-1] SignIn : %v", "User tidak ditemukan")
+			resp.Message = "User tidak ditemukan"
 			resp.Data = nil
 			return c.JSON(http.StatusNotFound, resp)
 		}
@@ -525,15 +525,23 @@ func (u *userHandler) CreateUserAccount(c echo.Context) error {
 		return response.RespondWithError(c, http.StatusUnprocessableEntity, "[UserHandler-3] CreateUserAccount", err)
 	}
 
+	hashedPassword, err := conv.HashPassword(req.Password)
+	if err != nil {
+		return response.RespondWithError(c, http.StatusInternalServerError, "[UserHandler-4] CreateUserAccount", err)
+	}
+
 	reqEntity := entity.UserEntity{
 		Name:     req.Name,
 		Email:    req.Email,
-		Password: req.Password,
+		Password: hashedPassword,
 	}
 
 	err = u.UserService.CreateUserAccount(ctx, reqEntity)
 	if err != nil {
-		return response.RespondWithError(c, http.StatusInternalServerError, "[UserHandler-4] CreateUserAccount", err)
+		if strings.Contains(err.Error(), "email exist") {
+			return response.RespondWithError(c, http.StatusConflict, "[UserHandler-5] CreateUserAccount", errors.New("email already exists"))
+		}
+		return response.RespondWithError(c, http.StatusInternalServerError, "[UserHandler-5] CreateUserAccount", err)
 	}
 
 	resp.Message = "Success"

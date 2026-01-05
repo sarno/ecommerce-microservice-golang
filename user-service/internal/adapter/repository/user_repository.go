@@ -399,6 +399,17 @@ func (u *UserRepository) UpdateUserVerified(ctx context.Context, userID int) (*e
 func (u *UserRepository) CreateUserAccount(ctx context.Context, req entity.UserEntity) (int, error) {
 	var roleId int
 
+	// Check if email already exists
+	existingUser := models.User{}
+	errCheck := u.db.WithContext(ctx).Where("email = ?", req.Email).First(&existingUser).Error
+	if errCheck == nil {
+		return 0, errors.New("Email sudah terdaftar")
+	}
+	if !errors.Is(errCheck, gorm.ErrRecordNotFound) {
+		log.Errorf("[UserRepository-0] CreateUserAccount: Failed to check existing email: %v", errCheck)
+		return 0, errCheck
+	}
+
 	if err := u.db.WithContext(ctx).Select("id").
 		Where("name = ?", "user").
 		Model(&models.Role{}).

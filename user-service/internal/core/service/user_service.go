@@ -205,7 +205,7 @@ func (u *UserService) ForgotPassword(ctx context.Context, req entity.UserEntity)
 	}
 
 	if user == nil {
-		err = errors.New("user not found")
+		err = errors.New("User tidak ditemukan")
 		log.Errorf("[UserService-2] ForgotPassword: %v", err)
 		return err
 	}
