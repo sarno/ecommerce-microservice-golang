@@ -204,6 +204,7 @@ func (u *userHandler) SignIn(c echo.Context) error {
 	respSign.Lat = user.Lat
 	respSign.Lng = user.Lng
 	respSign.AccessToken = token
+	respSign.Role = user.RoleName // Assign RoleName here
 
 	resp.Message = "success"
 	resp.Data = respSign
@@ -525,15 +526,10 @@ func (u *userHandler) CreateUserAccount(c echo.Context) error {
 		return response.RespondWithError(c, http.StatusUnprocessableEntity, "[UserHandler-3] CreateUserAccount", err)
 	}
 
-	hashedPassword, err := conv.HashPassword(req.Password)
-	if err != nil {
-		return response.RespondWithError(c, http.StatusInternalServerError, "[UserHandler-4] CreateUserAccount", err)
-	}
-
 	reqEntity := entity.UserEntity{
 		Name:     req.Name,
 		Email:    req.Email,
-		Password: hashedPassword,
+		Password: req.Password,
 	}
 
 	err = u.UserService.CreateUserAccount(ctx, reqEntity)
